@@ -1,17 +1,84 @@
-# CarRent — integration
+# CarRent
 
-Cette branche rassemble trois projets distincts. Ils sont conservés dans des
-sous-dossiers séparés : leurs backends, applications et dépendances ne sont
-pas fusionnés en une API unique.
+Application de location de voitures réunissant la gestion des clients, des
+véhicules et des réservations dans une API Node.js/MongoDB et une app Flutter.
+Le tableau de bord Web admin utilise la même API.
 
-## Projets
+## Architecture
 
-- [`modules/feryel/`](modules/feryel/README.md) — gestion des clients, API,
-  application Flutter et tableau de bord administrateur.
-- [`modules/gestion-vehicule/`](modules/gestion-vehicule/README.md) — gestion
-  des véhicules, API et application Flutter.
-- [`modules/nour/`](modules/nour/README.md) — réservations, API et application
-  Flutter.
+- `backend/` — API Express, authentification JWT, clients, véhicules et
+  réservations.
+- `mobile/` — app Flutter : connexion/profil, catalogue et gestion admin des
+  véhicules, recherche et réservation, historique.
+- `admin_dashboard/` — tableau de bord Web pour la gestion des clients.
 
-Pour les prérequis et le démarrage, consulter le README de chaque projet et
-exécuter ses commandes depuis son propre sous-dossier.
+Les clients actifs peuvent consulter les véhicules et réserver. Les opérations
+de gestion des véhicules et les fonctions d’administration nécessitent un compte
+admin. Le serveur calcule le prix d’une réservation à partir du prix journalier
+du véhicule et empêche les doubles réservations sur les mêmes jours.
+
+## Démarrer l’API
+
+Prérequis : Node.js LTS et MongoDB local ou MongoDB Atlas.
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+```
+
+Générer une clé JWT de développement, puis la renseigner dans `backend/.env` :
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Configurer `MONGODB_URI` dans `.env`, puis lancer :
+
+```powershell
+npm install
+npm test
+npm start
+```
+
+L’API écoute par défaut sur `http://localhost:5000`. Au démarrage, elle crée
+les index MongoDB requis pour les véhicules et les réservations.
+
+Pour créer les comptes de démonstration et quelques véhicules :
+
+```powershell
+node seed.js
+```
+
+**Attention :** le seed supprime les utilisateurs existants avant de recréer
+les comptes de démonstration. Il n’efface pas les véhicules existants.
+L’inscription par email nécessite également de configurer les paramètres SMTP
+dans `.env`.
+
+## Démarrer l’app Flutter
+
+Prérequis : Flutter SDK. Dans un autre terminal :
+
+```powershell
+cd mobile
+flutter pub get
+flutter run
+```
+
+L’émulateur Android utilise `10.0.2.2` pour joindre l’API sur le PC. Pour un
+téléphone physique, fournir l’adresse IP du PC :
+
+```powershell
+flutter run --dart-define=CARRENT_API_BASE_URL=http://192.168.1.20:5000/api
+```
+
+Remplacer l’adresse d’exemple par l’IP réelle du PC.
+
+## Tableau de bord admin
+
+Servir `admin_dashboard/` avec un serveur HTTP local et ouvrir `index.html`.
+Le tableau de bord appelle l’API sur `http://localhost:5000/api/users`.
+
+## Vérifications
+
+- Backend : `cd backend; npm test`
+- Flutter : `cd mobile; flutter test` et `flutter analyze`

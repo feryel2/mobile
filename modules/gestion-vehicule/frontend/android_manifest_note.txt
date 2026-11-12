@@ -1,3 +1,0 @@
-Pour Android, dans android/app/src/main/AndroidManifest.xml, ajoute l'attribut
-android:usesCleartextTraffic="true" dans la balise <application> si l'application
-ne parvient pas à appeler l'API locale en HTTP pendant le développement.
