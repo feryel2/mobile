@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/user_model.dart';
 import '../services/user_service.dart';
 import 'password_reset_screen.dart';
 import 'profile_screen.dart';
@@ -42,8 +43,11 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _openAdminDashboard() async {
-    final uri = Uri.parse('http://localhost:8080/');
+  Future<void> _openAdminDashboard({String? loginTicket}) async {
+    final dashboardUri = Uri.parse('http://localhost:8080/');
+    final uri = loginTicket == null
+        ? dashboardUri
+        : dashboardUri.replace(fragment: 'admin_ticket=$loginTicket');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
         mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -139,6 +143,23 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _isLoading = false);
 
       if (result['success'] == true) {
+        final user = result['user'] as User;
+        if (user.role == 'admin') {
+          final handoff = await _userService.createAdminDashboardTicket();
+          if (!mounted) return;
+          if (handoff['success'] != true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(handoff['message'] ?? 'Accès admin impossible.'),
+                backgroundColor: const Color(0xFFDC3545),
+              ),
+            );
+            return;
+          }
+          await _openAdminDashboard(loginTicket: handoff['ticket'] as String);
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

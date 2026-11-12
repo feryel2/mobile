@@ -296,6 +296,40 @@ class UserService {
     }
   }
 
+  Future<Map<String, dynamic>> createAdminDashboardTicket() async {
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Connectez-vous avant d’ouvrir le tableau de bord.'
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/admin-login-tickets'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 201 &&
+          data['success'] == true &&
+          data['ticket'] is String) {
+        return {'success': true, 'ticket': data['ticket']};
+      }
+      return {
+        'success': false,
+        'message': data['message'] ??
+            'Impossible de préparer l’accès au tableau de bord.'
+      };
+    } catch (error) {
+      return {'success': false, 'message': 'Erreur réseau : $error'};
+    }
+  }
+
   // 3. Récupérer le Profil (Get Profile)
   Future<Map<String, dynamic>> getProfile() async {
     try {

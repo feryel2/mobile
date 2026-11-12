@@ -1,10 +1,17 @@
+const crypto = require('crypto');
 const User = require('../models/User');
+const AdminLoginTicket = require('../models/AdminLoginTicket');
 const EmailVerification = require('../models/EmailVerification');
 const { consumeCode } = require('./emailVerificationController');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
 const emailPattern = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
+const adminLoginTicketLifetimeMs = 60 * 1000;
+
+function hashAdminLoginTicket(ticket) {
+  return crypto.createHash('sha256').update(ticket).digest('hex');
+}
 
 // Générateur de Token JWT
 const generateToken = (userId, role) => {
@@ -165,6 +172,76 @@ exports.login = async (req, res) => {
       success: false,
       message: 'Erreur lors de la connexion.',
       error: error.message
+    });
+  }
+};
+
+exports.createAdminLoginTicket = async (req, res) => {
+  if (req.user?.role !== 'admin' || req.user.status !== 'active') {
+    return res.status(403).json({
+      success: false,
+      message: 'Un compte administrateur actif est nécessaire.'
+    });
+  }
+
+  try {
+    const now = new Date();
+    const ticket = crypto.randomBytes(32).toString('hex');
+    await AdminLoginTicket.deleteMany({ expiresAt: { $lte: now } });
+    await AdminLoginTicket.create({
+      ticketHash: hashAdminLoginTicket(ticket),
+      userId: req.user._id,
+      expiresAt: new Date(now.getTime() + adminLoginTicketLifetimeMs)
+    });
+    return res.status(201).json({
+      success: true,
+      ticket
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Impossible de préparer la connexion au tableau de bord.'
+    });
+  }
+};
+
+exports.consumeAdminLoginTicket = async (req, res) => {
+  const { ticket } = req.body || {};
+  if (typeof ticket !== 'string' || !/^[a-f0-9]{64}$/i.test(ticket)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Lien de connexion administrateur invalide ou expiré.'
+    });
+  }
+
+  try {
+    const loginTicket = await AdminLoginTicket.findOneAndDelete({
+      ticketHash: hashAdminLoginTicket(ticket),
+      expiresAt: { $gt: new Date() }
+    });
+    if (!loginTicket) {
+      return res.status(401).json({
+        success: false,
+        message: 'Lien de connexion administrateur invalide ou expiré.'
+      });
+    }
+
+    const user = await User.findById(loginTicket.userId);
+    if (!user || user.role !== 'admin' || user.status !== 'active') {
+      return res.status(401).json({
+        success: false,
+        message: 'Le compte administrateur n’est plus autorisé.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      token: generateToken(user._id, user.role)
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Impossible de finaliser la connexion administrateur.'
     });
   }
 };

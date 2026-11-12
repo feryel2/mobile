@@ -514,9 +514,17 @@
   window.changeStatusFromModal = changeStatusFromModal;
   window.deleteClient = deleteClient;
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     clientModalInstance = new bootstrap.Modal(document.getElementById('clientModal'));
     document.getElementById('adminLoginForm').addEventListener('submit', loginAdmin);
+    try {
+      await AdminApi.consumeLoginTicketFromHash();
+      adminToken = AdminApi.getToken() || '';
+    } catch (error) {
+      showLogin(error.message || 'Impossible de vérifier le lien admin.');
+      return;
+    }
+
     if (!adminToken) {
       clientsData = [];
       updateStats(0, 0, 0, 0);

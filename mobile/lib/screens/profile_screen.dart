@@ -98,7 +98,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openAdminDashboard() async {
-    final uri = Uri.parse('http://localhost:8080/');
+    final handoff = await _userService.createAdminDashboardTicket();
+    if (!mounted) return;
+    if (handoff['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(handoff['message'] ?? 'Accès admin impossible.'),
+          backgroundColor: dangerColor,
+        ),
+      );
+      return;
+    }
+
+    final ticket = handoff['ticket'] as String;
+    final uri = Uri.parse('http://localhost:8080/')
+        .replace(fragment: 'admin_ticket=$ticket');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
         mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -761,12 +775,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.admin_panel_settings_outlined,
-                        color: Colors.white),
-                    onPressed: _openAdminDashboard,
-                    tooltip: 'Espace administrateur',
-                  ),
+                  if (_currentUser?.role == 'admin')
+                    IconButton(
+                      icon: const Icon(Icons.admin_panel_settings_outlined,
+                          color: Colors.white),
+                      onPressed: _openAdminDashboard,
+                      tooltip: 'Espace administrateur',
+                    ),
                   IconButton(
                     icon: const Icon(Icons.logout, color: Colors.white70),
                     onPressed: _logout,

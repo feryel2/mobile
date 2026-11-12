@@ -18,6 +18,10 @@ Les clients actifs peuvent consulter les véhicules et réserver. Les opération
 de gestion des véhicules et les fonctions d’administration nécessitent un compte
 admin. Le serveur calcule le prix d’une réservation à partir du prix journalier
 du véhicule et empêche les doubles réservations sur les mêmes jours.
+Après connexion avec un compte admin dans Flutter, le navigateur ouvre le
+back-office via un code à usage unique valable 60 secondes. Les comptes clients
+restent dans l’application. Le lien « Espace client » du back-office ouvre
+l’écran de connexion client et efface la session Flutter précédente.
 
 ## Démarrer l’API
 

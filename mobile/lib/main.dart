@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/auth_screen.dart';
@@ -6,7 +7,10 @@ import 'services/user_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final bool isAuth = await UserService.isAuthenticated();
+  final forceClientLogin =
+      kIsWeb && Uri.base.queryParameters['client_login'] == '1';
+  if (forceClientLogin) await UserService.clearSession();
+  final bool isAuth = !forceClientLogin && await UserService.isAuthenticated();
   runApp(CarRentApp(isAuth: isAuth));
 }
 

@@ -10,6 +10,7 @@ test('integrated vehicle writes and reservation creation require authentication'
   const { port } = server.address();
   for (const [path, method] of [
     ['/api/users/profile/email', 'PUT'],
+    ['/api/users/admin-login-tickets', 'POST'],
     ['/api/reservations/admin', 'GET'],
     ['/api/vehicles', 'POST'],
     ['/api/vehicles/507f1f77bcf86cd799439011', 'PUT'],
@@ -22,6 +23,20 @@ test('integrated vehicle writes and reservation creation require authentication'
     });
     assert.equal(response.status, 401, `${method} ${path} must require a JWT`);
   }
+});
+
+test('admin ticket consumption is public but validates its one-time code', async (context) => {
+  const server = app.listen(0);
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.once('listening', resolve));
+
+  const { port } = server.address();
+  const response = await fetch(`http://127.0.0.1:${port}/api/users/admin-login-tickets/consume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticket: 'invalid' })
+  });
+  assert.equal(response.status, 400);
 });
 
 test('password reset endpoints are public and validate their input', async (context) => {

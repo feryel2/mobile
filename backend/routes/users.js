@@ -22,6 +22,13 @@ router.post('/password-resets', passwordResetController.resetPassword);
 
 // 2. Connexion
 router.post('/login', userController.login);
+router.post('/admin-login-tickets/consume', userController.consumeAdminLoginTicket);
+router.post(
+  '/admin-login-tickets',
+  protect,
+  authorizeAdmin,
+  userController.createAdminLoginTicket
+);
 
 // --- ROUTES CLIENT PROTÉGÉES (JWT) ---
 // 3. Récupération des informations du profil connecté

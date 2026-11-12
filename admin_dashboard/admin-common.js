@@ -50,9 +50,31 @@
     return data.user;
   }
 
+  async function consumeLoginTicketFromHash() {
+    const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    const ticket = fragment.get('admin_ticket');
+    if (!ticket) return;
+
+    url.hash = '';
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+
+    const response = await fetch(`${apiBase}/users/admin-login-tickets/consume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket })
+    });
+    const data = await parseResponse(response);
+    if (!response.ok || !data.success || typeof data.token !== 'string') {
+      throw new Error(data.message || 'Le lien de connexion admin a expiré.');
+    }
+    localStorage.setItem(tokenKey, data.token);
+  }
+
   window.AdminApi = {
     request,
     login,
+    consumeLoginTicketFromHash,
     getToken: () => localStorage.getItem(tokenKey)
   };
 
@@ -115,13 +137,15 @@
       });
       document.getElementById('refreshPage').addEventListener('click', loadPage);
 
-      if (!AdminApi.getToken()) {
-        showLogin();
-        return;
-      }
+      (async () => {
+        try {
+          await consumeLoginTicketFromHash();
+          if (!AdminApi.getToken()) {
+            showLogin();
+            return;
+          }
 
-      request('/users/profile')
-        .then((result) => {
+          const result = await request('/users/profile');
           if (result.user?.role !== 'admin') {
             localStorage.removeItem(tokenKey);
             showLogin('Ce compte ne possède pas les droits administrateur.');
@@ -129,11 +153,11 @@
           }
           adminName.textContent = result.user.fullname;
           overlay.hidden = true;
-          return loadPage();
-        })
-        .catch((error) => {
-          if (AdminApi.getToken()) showLogin(error.message);
-        });
+          await loadPage();
+        } catch (error) {
+          showLogin(error.message || 'Impossible de vérifier la session admin.');
+        }
+      })();
     }
   };
 })();

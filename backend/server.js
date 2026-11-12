@@ -9,6 +9,7 @@ const userRoutes = require('./routes/users');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const reservationRoutes = require('./routes/reservationRoutes');
 const User = require('./models/User');
+const AdminLoginTicket = require('./models/AdminLoginTicket');
 const EmailVerification = require('./models/EmailVerification');
 const PasswordResetCode = require('./models/PasswordResetCode');
 const Vehicle = require('./models/Vehicle');
@@ -53,6 +54,7 @@ async function startServer() {
   await mongoose.connect(mongoUri);
   await Promise.all([
     User.createIndexes(),
+    AdminLoginTicket.createIndexes(),
     EmailVerification.createIndexes(),
     PasswordResetCode.createIndexes(),
     Vehicle.createIndexes(),
