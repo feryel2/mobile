@@ -1,4 +1,4 @@
-
+import 'widgets/price_conversion.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -566,6 +566,8 @@ class VehicleDetailScreen extends StatelessWidget {
                 'Synchronisation', synced ? 'Synchronisé' : 'En attente'),
           ]),
         ),
+        const SizedBox(height: 14),
+        PriceConversion(prixDt: vehicle.prix),
         const SizedBox(height: 18),
         if (onEdit != null)
           FilledButton.icon(
@@ -624,16 +626,11 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   // Noms EXACTS des fichiers présents dans assets/images/
   static const imageOptions = [
-    'default_car.png',
-    'toyota yaris.png',
-    'car_berline_blanche.png',
-    'car_berline_noire.png',
-    'car_suv_grise.png',
-    'car_suv_bleue.png',
-    'car_citadine_rouge.png',
-    'car_citadine_verte.png',
-    'car_citadine_jaune.png',
-    'car_sport_orange.png',
+    'kia_picanto.png',
+    'peugeot-208.png',
+    'renault-clio.png',
+    'renault.png',
+    'toyota_yaris.png',
   ];
   String image = 'default_car.png';
 
