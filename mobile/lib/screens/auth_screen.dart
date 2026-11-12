@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/user_service.dart';
+import 'password_reset_screen.dart';
 import 'profile_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -52,6 +53,27 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _openPasswordReset() async {
+    final email = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => PasswordResetScreen(
+          initialEmail: _emailController.text.trim(),
+        ),
+      ),
+    );
+    if (!mounted || email == null) return;
+    setState(() {
+      _emailController.text = email;
+      _passwordController.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Mot de passe modifié. Connectez-vous avec le nouveau.'),
+        backgroundColor: Color(0xFF28A745),
+      ),
+    );
   }
 
   Future<void> _sendVerificationCode() async {
@@ -381,14 +403,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Lien de réinitialisation envoyé par email.'),
-                                  ),
-                                );
-                              },
+                              onPressed: _openPasswordReset,
                               child: const Text(
                                 'Mot de passe oublié ?',
                                 style: TextStyle(

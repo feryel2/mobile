@@ -104,6 +104,65 @@ class UserService {
     }
   }
 
+  Future<Map<String, dynamic>> sendPasswordResetCode({
+    required String email,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/password-reset-codes'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email.trim()}),
+          )
+          .timeout(ApiConfig.timeout);
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'message': data['message'],
+          'resendAfterSeconds': data['resendAfterSeconds'] ?? 60,
+        };
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Impossible d’envoyer le code.',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur réseau : $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/password-resets'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email.trim(),
+              'code': code.trim(),
+              'newPassword': newPassword,
+            }),
+          )
+          .timeout(ApiConfig.timeout);
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'message': data['message']};
+      }
+      return {
+        'success': false,
+        'message':
+            data['message'] ?? 'Impossible de réinitialiser le mot de passe.',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur réseau : $e'};
+    }
+  }
+
   // 2. Connexion (Login)
   Future<Map<String, dynamic>> login({
     required String email,

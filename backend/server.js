@@ -10,6 +10,7 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const reservationRoutes = require('./routes/reservationRoutes');
 const User = require('./models/User');
 const EmailVerification = require('./models/EmailVerification');
+const PasswordResetCode = require('./models/PasswordResetCode');
 const Vehicle = require('./models/Vehicle');
 const Reservation = require('./models/Reservation');
 
@@ -53,6 +54,7 @@ async function startServer() {
   await Promise.all([
     User.createIndexes(),
     EmailVerification.createIndexes(),
+    PasswordResetCode.createIndexes(),
     Vehicle.createIndexes(),
     Reservation.createIndexes()
   ]);

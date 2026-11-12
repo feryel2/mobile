@@ -52,8 +52,8 @@ node seed.js
 Le seed ajoute les comptes de démonstration et les véhicules qui manquent ;
 il conserve les utilisateurs et véhicules déjà présents. Les mots de passe
 initiaux sont affichés dans le terminal uniquement pour les comptes créés.
-L’inscription par email nécessite également de configurer les paramètres SMTP
-dans `.env`.
+L’inscription et la réinitialisation du mot de passe par email nécessitent
+également de configurer les paramètres SMTP dans `.env`.
 
 ## Démarrer l’app Flutter
 

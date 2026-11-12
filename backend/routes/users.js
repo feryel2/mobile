@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const passwordResetController = require('../controllers/passwordResetController');
 const rentalController = require('../controllers/rentalController');
 const emailVerificationController = require('../controllers/emailVerificationController');
 const { protect, authorizeAdmin } = require('../middlewares/auth');
@@ -16,6 +17,8 @@ const userUploads = upload.fields([
 // 1. Email verification and client registration
 router.post('/email-verifications', emailVerificationController.sendCode);
 router.post('/register', userController.register);
+router.post('/password-reset-codes', passwordResetController.sendCode);
+router.post('/password-resets', passwordResetController.resetPassword);
 
 // 2. Connexion
 router.post('/login', userController.login);
