@@ -5,17 +5,23 @@ require('dotenv').config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/carrent_db';
 
+async function createUserIfMissing(userData) {
+  const existingUser = await User.findOne({ email: userData.email }).select('_id');
+  if (existingUser) {
+    console.log(`Compte déjà présent, conservé : ${userData.email}`);
+    return false;
+  }
+
+  await new User(userData).save();
+  return true;
+}
+
 const seedDatabase = async () => {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log('Connecté à MongoDB pour le seed...');
 
-    // Nettoyer les utilisateurs existants
-    await User.deleteMany({});
-    console.log('Anciens utilisateurs supprimés.');
-
-    // Créer un compte Admin
-    const admin = new User({
+    const admin = {
       fullname: 'Administrateur CarRent',
       email: 'admin@carrent.com',
       emailVerified: true,
@@ -24,8 +30,7 @@ const seedDatabase = async () => {
       role: 'admin',
       status: 'active',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces'
-    });
-    await admin.save();
+    };
 
     // Créer des comptes clients d'exemple
     const clients = [
@@ -76,9 +81,10 @@ const seedDatabase = async () => {
       }
     ];
 
-    for (const c of clients) {
-      const user = new User(c);
-      await user.save();
+    const demoUsers = [admin, ...clients];
+    const insertedUsers = [];
+    for (const user of demoUsers) {
+      if (await createUserIfMissing(user)) insertedUsers.push(user);
     }
 
     const vehicles = [
@@ -126,11 +132,13 @@ const seedDatabase = async () => {
     }
 
     console.log('✅ Base de données initialisée avec succès !');
-    console.log('Véhicules de démonstration créés s’ils étaient absents.');
-    console.log('Compte Admin : admin@carrent.com / adminpassword123');
-    console.log('Compte Client 1 : alexandre.dupont@email.com / password123 (Actif)');
-    console.log('Compte Client 2 : sarah.benali@email.com / password123 (En attente de validation)');
-    console.log('Compte Client 3 : julien.martin@email.com / password123 (Suspendu)');
+    console.log('Les véhicules de démonstration ont été ajoutés s’ils étaient absents.');
+    if (insertedUsers.length > 0) {
+      console.log('Comptes de démonstration nouvellement créés :');
+      for (const user of insertedUsers) {
+        console.log(`${user.email} / ${user.password}`);
+      }
+    }
 
     process.exit(0);
   } catch (error) {

@@ -49,8 +49,9 @@ Pour créer les comptes de démonstration et quelques véhicules :
 node seed.js
 ```
 
-**Attention :** le seed supprime les utilisateurs existants avant de recréer
-les comptes de démonstration. Il n’efface pas les véhicules existants.
+Le seed ajoute les comptes de démonstration et les véhicules qui manquent ;
+il conserve les utilisateurs et véhicules déjà présents. Les mots de passe
+initiaux sont affichés dans le terminal uniquement pour les comptes créés.
 L’inscription par email nécessite également de configurer les paramètres SMTP
 dans `.env`.
 
