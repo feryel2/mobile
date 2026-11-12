@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CarRent Admin - Gestion des Clients</title>
+  <!-- Google Fonts: Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    :root {
+      --primary-color: #0052CC;
+      --primary-hover: #0747A6;
+      --success-color: #28A745;
+      --warning-color: #FFC107;
+      --danger-color: #DC3545;
+      --bg-color: #F8F9FA;
+      --card-bg: #FFFFFF;
+      --text-dark: #1E293B;
+      --text-muted: #64748B;
+      --border-color: #E2E8F0;
+    }
+
+    * {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 260px;
+      background: #FFFFFF;
+      border-right: 1px solid var(--border-color);
+      min-height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      transition: all 0.3s ease;
+    }
+
+    .brand-logo {
+      padding: 24px 20px;
+      font-weight: 800;
+      font-size: 22px;
+      color: var(--text-dark);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo i {
+      color: var(--primary-color);
+      font-size: 26px;
+    }
+
+    .brand-logo span {
+      color: var(--primary-color);
+    }
+
+    .nav-link {
+      padding: 12px 20px;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 14px;
+      border-radius: 12px;
+      margin: 4px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      background-color: rgba(0, 82, 204, 0.08);
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    /* Main Content Wrapper */
+    .main-wrapper {
+      margin-left: 260px;
+      padding: 28px 36px;
+    }
+
+    /* Header Bar */
+    .top-header {
+      background: white;
+      border-radius: 16px;
+      padding: 16px 24px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--border-color);
+    }
+
+    /* KPI Cards */
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 22px 24px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.03);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+    }
+
+    .stat-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .icon-primary { background: rgba(0, 82, 204, 0.12); color: var(--primary-color); }
+    .icon-success { background: rgba(40, 167, 69, 0.12); color: var(--success-color); }
+    .icon-warning { background: rgba(255, 193, 7, 0.18); color: #B78103; }
+    .icon-danger  { background: rgba(220, 53, 69, 0.12); color: var(--danger-color); }
+
+    /* Modern Table Card */
+    .content-card {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+    }
+
+    .table th {
+      background: #F8FAFC;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .table td {
+      padding: 16px 20px;
+      vertical-align: middle;
+      font-size: 13.5px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    /* Pill Badges */
+    .badge-status {
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-active {
+      background-color: rgba(40, 167, 69, 0.12);
+      color: var(--success-color);
+    }
+
+    .badge-pending {
+      background-color: rgba(255, 193, 7, 0.2);
+      color: #9A6700;
+    }
+
+    .badge-suspended {
+      background-color: rgba(220, 53, 69, 0.12);
+      color: var(--danger-color);
+    }
+
+    /* Pill Buttons */
+    .btn-pill {
+      border-radius: 30px;
+      padding: 7px 18px;
+      font-size: 12.5px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary-custom {
+      background-color: var(--primary-color);
+      border-color: var(--primary-color);
+      color: white;
+    }
+
+    .btn-primary-custom:hover {
+      background-color: var(--primary-hover);
+      border-color: var(--primary-hover);
+      color: white;
+    }
+
+    .avatar-img {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .avatar-placeholder {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(0, 82, 204, 0.1);
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.68);
+    }
+
+    .auth-overlay[hidden] {
+      display: none;
+    }
+
+    .auth-card {
+      width: min(100%, 430px);
+      padding: 32px;
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+    }
+
+    .client-profile-hero {
+      padding: 24px;
+      border-radius: 18px;
+      background: linear-gradient(125deg, #eff6ff, #f8fafc 65%);
+      border: 1px solid #dbeafe;
+    }
+
+    .client-profile-avatar {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      object-fit: cover;
+      background: #dbeafe;
+    }
+
+    .client-profile-initials {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      background: #dbeafe;
+      color: var(--primary-color);
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .profile-info-card, .profile-metric-card {
+      height: 100%;
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .profile-info-label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .profile-info-value {
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+      font-weight: 600;
+    }
+
+    .client-profile-link {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-dark);
+      text-align: left;
+    }
+
+    .client-profile-link:hover {
+      color: var(--primary-color);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand-logo">
+      <i class="fa-solid fa-car-side"></i>
+      Car<span>Rent</span>
+    </div>
+    <div class="py-3">
+      <div class="px-4 pb-2 text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">Menu Principal</div>
+      <a href="#" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Vue d'ensemble</a>
+      <a href="#" class="nav-link"><i class="fa-solid fa-car"></i> Parc Automobile</a>
+      <a href="#" class="nav-link"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
+      <a href="#" class="nav-link active"><i class="fa-solid fa-users"></i> Gestion Clients</a>
+      <a href="#" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Facturation</a>
+      <div class="px-4 pt-4 pb-2 text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">Système</div>
+      <a href="#" class="nav-link"><i class="fa-solid fa-gear"></i> Paramètres</a>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-wrapper">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div>
+        <h4 class="mb-1 fw-bold text-dark">Gestion des Clients</h4>
+        <p class="mb-0 text-muted" style="font-size: 13px;">Supervisez, validez et gérez tous les comptes clients de CarRent</p>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <a class="btn btn-outline-primary btn-pill" href="http://localhost:5173/" target="_blank" rel="noopener noreferrer">
+          <i class="fa-solid fa-user me-1"></i> Espace client
+        </a>
+        <button class="btn btn-outline-secondary btn-pill" onclick="loadClients()">
+          <i class="fa-solid fa-rotate-right me-1"></i> Actualiser
+        </button>
+        <button class="btn btn-outline-danger btn-pill" onclick="logoutAdmin()">
+          <i class="fa-solid fa-right-from-bracket me-1"></i> Déconnexion
+        </button>
+        <div class="d-flex align-items-center gap-2 border-start ps-3">
+          <div class="avatar-placeholder"><i class="fa-solid fa-user-shield"></i></div>
+          <div class="d-none d-md-block text-start">
+            <div class="fw-bold" style="font-size: 13px;" id="adminName">Administrateur</div>
+            <div class="text-muted" style="font-size: 11px;">Gestion clients</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI Statistics Row -->
+    <section class="row g-3 mb-4">
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">Total Clients</span>
+            <h3 class="fw-bold my-1 text-dark" id="stat-total">3</h3>
+            <span class="text-muted" style="font-size: 12px;"><i class="fa-solid fa-users text-primary me-1"></i> Inscrits sur CarRent</span>
+          </div>
+          <div class="stat-icon icon-primary">
+            <i class="fa-solid fa-users"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">Clients Actifs</span>
+            <h3 class="fw-bold my-1 text-success" id="stat-active">1</h3>
+            <span class="text-success" style="font-size: 12px;"><i class="fa-solid fa-circle-check me-1"></i> Profils vérifiés</span>
+          </div>
+          <div class="stat-icon icon-success">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">En Attente Validation</span>
+            <h3 class="fw-bold my-1 text-warning" id="stat-pending">1</h3>
+            <span class="text-warning" style="font-size: 12px;"><i class="fa-solid fa-clock me-1"></i> Permis à valider</span>
+          </div>
+          <div class="stat-icon icon-warning">
+            <i class="fa-solid fa-id-card"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-muted text-uppercase" style="font-size: 11px; font-weight: 700;">Comptes Suspendus</span>
+            <h3 class="fw-bold my-1 text-danger" id="stat-suspended">1</h3>
+            <span class="text-danger" style="font-size: 12px;"><i class="fa-solid fa-triangle-exclamation me-1"></i> Accès bloqué</span>
+          </div>
+          <div class="stat-icon icon-danger">
+            <i class="fa-solid fa-user-slash"></i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Content Table Card -->
+    <section class="content-card">
+      <div id="feedbackAlert" class="alert mx-3 mt-3 mb-0" role="status" aria-live="polite" hidden></div>
+      <!-- Search & Filters Toolbar -->
+      <div class="p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 380px;">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0" style="border-radius: 30px 0 0 30px;">
+              <i class="fa-solid fa-magnifying-glass text-muted"></i>
+            </span>
+            <input type="search" id="searchInput" class="form-control border-start-0" placeholder="Rechercher par nom, email, permis..." style="border-radius: 0 30px 30px 0;" oninput="filterTable()">
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <select id="statusFilter" class="form-select btn-pill" style="width: auto; min-width: 170px;" onchange="filterTable()">
+            <option value="">Tous les statuts</option>
+            <option value="active">Actif</option>
+            <option value="pending_approval">En attente permis</option>
+            <option value="suspended">Suspendu</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Email</th>
+              <th>Téléphone</th>
+              <th>Permis de conduire</th>
+              <th>Statut</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="clientsTableBody">
+            <!-- Dynamic rows will be inserted here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Footer / Pagination -->
+      <div class="p-3 border-top d-flex align-items-center justify-content-between text-muted" style="font-size: 13px;">
+        <span id="footerCountText">Connectez-vous pour afficher les clients.</span>
+        <div class="d-flex gap-1">
+          <button id="previousPage" class="btn btn-sm btn-outline-secondary btn-pill" onclick="changePage(-1)" disabled aria-label="Page précédente"><i class="fa-solid fa-chevron-left"></i></button>
+          <span id="pageIndicator" class="btn btn-sm btn-light btn-pill" aria-live="polite">0 / 0</span>
+          <button id="nextPage" class="btn btn-sm btn-outline-secondary btn-pill" onclick="changePage(1)" disabled aria-label="Page suivante"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Dossier complet du client -->
+  <div class="modal fade" id="clientModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content" style="border-radius: 20px; overflow: hidden; border: none;">
+        <div class="modal-header bg-primary text-white p-4">
+          <div>
+            <h5 class="modal-title fw-bold" id="modalClientName">Dossier client</h5>
+            <div class="small text-white-50">Profil, permis et activité de location</div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <section class="client-profile-hero mb-4">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <div class="position-relative">
+                <img id="modalAvatar" src="" class="client-profile-avatar shadow-sm" alt="Photo du client" hidden>
+                <div id="modalAvatarInitials" class="client-profile-initials"></div>
+              </div>
+              <div class="flex-grow-1">
+                <h4 class="fw-bold mb-1" id="modalFullname"></h4>
+                <div id="modalStatusBadge" class="mb-2"></div>
+                <div class="d-flex flex-wrap gap-3 small text-muted">
+                  <span><i class="fa-solid fa-envelope me-1 text-primary"></i><span id="modalEmail"></span></span>
+                  <span id="modalEmailBadge"></span>
+                  <span><i class="fa-solid fa-phone me-1 text-primary"></i><span id="modalPhone"></span></span>
+                </div>
+              </div>
+              <div class="small text-muted">ID client<br><strong id="modalClientId" class="text-dark"></strong></div>
+            </div>
+          </section>
+
+          <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6">
+              <section class="profile-info-card">
+                <h6 class="fw-bold mb-3"><i class="fa-solid fa-user me-2 text-primary"></i>Informations du compte</h6>
+                <div class="row g-3">
+                  <div class="col-6"><div class="profile-info-label">Créé le</div><div class="profile-info-value" id="modalCreatedAt">-</div></div>
+                  <div class="col-6"><div class="profile-info-label">Mis à jour le</div><div class="profile-info-value" id="modalUpdatedAt">-</div></div>
+                </div>
+              </section>
+            </div>
+            <div class="col-12 col-md-6">
+              <section class="profile-info-card">
+                <h6 class="fw-bold mb-3"><i class="fa-solid fa-id-card me-2 text-primary"></i>Permis de conduire</h6>
+                <div class="row g-3">
+                  <div class="col-6"><div class="profile-info-label">Numéro</div><div class="profile-info-value" id="modalLicenseNumber">-</div></div>
+                  <div class="col-6"><div class="profile-info-label">Délivré le</div><div class="profile-info-value" id="modalLicenseDate">-</div></div>
+                </div>
+                <div class="mt-3">
+                  <div class="profile-info-label mb-2">Document justificatif</div>
+                  <div id="modalLicensePhotoContainer" class="border rounded-3 p-2 bg-light text-center">
+                    <a id="modalLicensePhotoLink" target="_blank" rel="noopener noreferrer" aria-label="Ouvrir la photo du permis dans un nouvel onglet">
+                      <img id="modalLicensePhoto" src="" class="img-fluid rounded" style="max-height: 220px; object-fit: contain;" alt="Photo du permis de conduire" hidden>
+                    </a>
+                    <div id="modalNoLicensePhoto" class="p-3 text-muted small"><i class="fa-solid fa-image-slash me-2"></i>Aucune photo fournie</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <section class="mb-2">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h6 class="fw-bold mb-0"><i class="fa-solid fa-chart-line me-2 text-primary"></i>Activité de location</h6>
+              <span id="modalRentalSummary" class="small text-muted" aria-live="polite">Chargement…</span>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-4"><div class="profile-metric-card"><div class="profile-info-label">Locations</div><div class="fs-4 fw-bold" id="modalRentalCount">-</div></div></div>
+              <div class="col-4"><div class="profile-metric-card"><div class="profile-info-label">Terminées</div><div class="fs-4 fw-bold text-success" id="modalRentalCompleted">-</div></div></div>
+              <div class="col-4"><div class="profile-metric-card"><div class="profile-info-label">Montant confirmé</div><div class="fs-5 fw-bold text-primary" id="modalRentalSpend">-</div></div></div>
+            </div>
+            <div id="modalRentalHistory" class="border rounded-3 overflow-hidden" aria-live="polite">Chargement de l’historique…</div>
+          </section>
+        </div>
+        <div class="modal-footer bg-light p-3">
+          <button type="button" class="btn btn-secondary btn-pill" data-bs-dismiss="modal">Fermer</button>
+          <button type="button" id="modalBtnStatus" class="btn btn-outline-warning btn-pill" onclick="toggleStatusFromModal()"></button>
+          <button type="button" id="modalBtnValidate" class="btn btn-success btn-pill" onclick="changeStatusFromModal('active')">
+            <i class="fa-solid fa-check me-1"></i> Valider le permis
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminLoginOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form id="adminLoginForm" class="auth-card">
+      <div class="text-center mb-4">
+        <div class="stat-icon icon-primary mx-auto mb-3"><i class="fa-solid fa-user-shield"></i></div>
+        <h2 id="loginTitle" class="h4 fw-bold">Espace administrateur</h2>
+        <p class="text-muted mb-0">Connectez-vous pour gérer les comptes clients.</p>
+      </div>
+      <div class="mb-3">
+        <label for="adminEmail" class="form-label">Adresse email</label>
+        <input id="adminEmail" name="email" type="email" class="form-control" autocomplete="username" required>
+      </div>
+      <div class="mb-3">
+        <label for="adminPassword" class="form-label">Mot de passe</label>
+        <input id="adminPassword" name="password" type="password" class="form-control" autocomplete="current-password" required>
+      </div>
+      <div id="loginError" class="alert alert-danger py-2" role="alert" hidden></div>
+      <button id="loginSubmit" type="submit" class="btn btn-primary w-100 btn-pill">
+        <i class="fa-solid fa-right-to-bracket me-1"></i> Se connecter
+      </button>
+    </form>
+  </div>
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const API_URL = 'http://localhost:5000/api/users';
+    let adminToken = localStorage.getItem('carrent_admin_token') || '';
+    let clientsData = [];
+    let currentSelectedClient = null;
+    let clientModalInstance = null;
+  </script>
+
+  <script type="text/plain">
+    // Configuration API Backend
+    const API_URL = 'http://localhost:5000/api/users';
+    let adminToken = localStorage.getItem('carrent_admin_token') || '';
+
+    // Données par défaut pour démonstration autonome immédiate
+    let clientsData = [
+      {
+        _id: '1',
+        fullname: 'Alexandre Dupont',
+        email: 'alexandre.dupont@email.com',
+        phone: '+33 6 98 76 54 32',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=faces',
+        status: 'active',
+        driverLicense: {
+          number: 'DL-758921-FR',
+          issuedDate: '2020-04-15',
+          photoUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600'
+        }
+      },
+      {
+        _id: '2',
+        fullname: 'Sarah Benali',
+        email: 'sarah.benali@email.com',
+        phone: '+33 7 45 12 89 63',
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=faces',
+        status: 'pending_approval',
+        driverLicense: {
+          number: 'DL-882319-FR',
+          issuedDate: '2023-08-20',
+          photoUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600'
+        }
+      },
+      {
+        _id: '3',
+        fullname: 'Julien Martin',
+        email: 'julien.martin@email.com',
+        phone: '+33 6 11 22 33 44',
+        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=faces',
+        status: 'suspended',
+        driverLicense: {
+          number: 'DL-341902-FR',
+          issuedDate: '2018-02-10',
+          photoUrl: ''
+        }
+      }
+    ];
+
+    let currentSelectedClient = null;
+    let clientModalInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      clientModalInstance = new bootstrap.Modal(document.getElementById('clientModal'));
+      loadClients();
+    });
+
+    // Chargement des données (tente l'API sinon utilise les données locales)
+    async function loadClients() {
+      try {
+        const headers = adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {};
+        const response = await fetch(API_URL, { headers });
+        if (response.ok) {
+          const res = await response.json();
+          if (res.success && res.data) {
+            clientsData = res.data;
+            if (res.stats) {
+              updateStats(res.stats.totalClients, res.stats.activeCount, res.stats.pendingCount, res.stats.suspendedCount);
+            }
+          }
+        }
+      } catch (err) {
+        console.log('Connexion API backend en attente. Mode démonstration interactif actif.');
+      }
+      renderTable(clientsData);
+      refreshStatsFromData();
+    }
+
+    function refreshStatsFromData() {
+      const total = clientsData.length;
+      const active = clientsData.filter(c => c.status === 'active').length;
+      const pending = clientsData.filter(c => c.status === 'pending_approval').length;
+      const suspended = clientsData.filter(c => c.status === 'suspended').length;
+      updateStats(total, active, pending, suspended);
+    }
+
+    function updateStats(total, active, pending, suspended) {
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-active').innerText = active;
+      document.getElementById('stat-pending').innerText = pending;
+      document.getElementById('stat-suspended').innerText = suspended;
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('clientsTableBody');
+      tbody.innerHTML = '';
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">Aucun client trouvé correspondant aux critères.</td></tr>`;
+        document.getElementById('footerCountText').innerText = `Affichage de 0 client`;
+        return;
+      }
+
+      list.forEach(client => {
+        const tr = document.createElement('tr');
+
+        // Avatar
+        const avatarHtml = client.avatar
+          ? `<img src="${client.avatar}" class="avatar-img me-2" alt="${client.fullname}">`
+          : `<div class="avatar-placeholder me-2">${client.fullname.charAt(0)}</div>`;
+
+        // Badge Statut
+        let statusBadge = '';
+        if (client.status === 'active') {
+          statusBadge = `<span class="badge-status badge-active"><i class="fa-solid fa-circle-check"></i> Actif</span>`;
+        } else if (client.status === 'pending_approval') {
+          statusBadge = `<span class="badge-status badge-pending"><i class="fa-solid fa-clock"></i> En attente</span>`;
+        } else {
+          statusBadge = `<span class="badge-status badge-suspended"><i class="fa-solid fa-ban"></i> Suspendu</span>`;
+        }
+
+        // License string
+        const licenseStr = client.driverLicense && client.driverLicense.number
+          ? `<span class="badge bg-light text-dark border px-2 py-1"><i class="fa-solid fa-id-card text-primary me-1"></i> ${client.driverLicense.number}</span>`
+          : `<span class="text-muted small">Non renseigné</span>`;
+
+        tr.innerHTML = `
+          <td>
+            <div class="d-flex align-items-center">
+              ${avatarHtml}
+              <div>
+                <div class="fw-bold">${client.fullname}</div>
+                <div class="text-muted small">ID: ${client._id.substring(0, 6)}...</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="text-dark">${client.email}</span></td>
+          <td><span class="text-dark">${client.phone || '-'}</span></td>
+          <td>${licenseStr}</td>
+          <td>${statusBadge}</td>
+          <td class="text-end">
+            <div class="d-flex justify-content-end gap-1">
+              <button class="btn btn-sm btn-outline-primary btn-pill" title="Consulter" onclick="openDetailsModal('${client._id}')">
+                <i class="fa-solid fa-eye"></i> Consulter
+              </button>
+              ${client.status === 'suspended'
+                ? `<button class="btn btn-sm btn-outline-success btn-pill" title="Activer" onclick="toggleStatus('${client._id}', 'active')"><i class="fa-solid fa-check"></i> Activer</button>`
+                : `<button class="btn btn-sm btn-outline-warning btn-pill" title="Suspendre" onclick="toggleStatus('${client._id}', 'suspended')"><i class="fa-solid fa-ban"></i> Suspendre</button>`
+              }
+              <button class="btn btn-sm btn-outline-danger btn-pill" title="Supprimer" onclick="deleteClient('${client._id}')">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('footerCountText').innerText = `Affichage de ${list.length} client${list.length > 1 ? 's' : ''}`;
+    }
+
+    function filterTable() {
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      const status = document.getElementById('statusFilter').value;
+
+      const filtered = clientsData.filter(client => {
+        const matchesSearch =
+          client.fullname.toLowerCase().includes(search) ||
+          client.email.toLowerCase().includes(search) ||
+          (client.phone && client.phone.toLowerCase().includes(search)) ||
+          (client.driverLicense && client.driverLicense.number && client.driverLicense.number.toLowerCase().includes(search));
+
+        const matchesStatus = status ? client.status === status : true;
+
+        return matchesSearch && matchesStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    // Modal consultation
+    function openDetailsModal(id) {
+      const client = clientsData.find(c => c._id === id);
+      if (!client) return;
+
+      currentSelectedClient = client;
+
+      document.getElementById('modalFullname').innerText = client.fullname;
+      document.getElementById('modalEmail').innerText = client.email;
+      document.getElementById('modalPhone').innerText = client.phone || 'Non renseigné';
+      document.getElementById('modalAvatar').src = client.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+
+      const license = client.driverLicense || {};
+      document.getElementById('modalLicenseNumber').innerText = license.number || 'Aucun';
+      document.getElementById('modalLicenseDate').innerText = license.issuedDate
+        ? new Date(license.issuedDate).toLocaleDateString('fr-FR')
+        : 'Inconnue';
+
+      const photoEl = document.getElementById('modalLicensePhoto');
+      const photoContainer = document.getElementById('modalLicensePhotoContainer');
+      if (license.photoUrl) {
+        photoEl.src = license.photoUrl;
+        photoEl.style.display = 'block';
+      } else {
+        photoEl.style.display = 'none';
+        photoContainer.innerHTML = '<div class="p-4 text-muted small"><i class="fa-solid fa-image-slash fa-2x mb-2 d-block"></i>Aucune photo de permis fournie</div>';
+      }
+
+      // Statut badge
+      const badgeContainer = document.getElementById('modalStatusBadge');
+      if (client.status === 'active') {
+        badgeContainer.innerHTML = '<span class="badge-status badge-active"><i class="fa-solid fa-circle-check"></i> Actif</span>';
+      } else if (client.status === 'pending_approval') {
+        badgeContainer.innerHTML = '<span class="badge-status badge-pending"><i class="fa-solid fa-clock"></i> En attente</span>';
+      } else {
+        badgeContainer.innerHTML = '<span class="badge-status badge-suspended"><i class="fa-solid fa-ban"></i> Suspendu</span>';
+      }
+
+      clientModalInstance.show();
+    }
+
+    // Changer le statut (activer / suspendre / valider)
+    async function toggleStatus(id, newStatus) {
+      const client = clientsData.find(c => c._id === id);
+      if (!client) return;
+
+      // Appel API si disponible
+      try {
+        await fetch(`${API_URL}/${id}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {})
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+      } catch (err) {
+        console.log('Mise à jour en mode local.');
+      }
+
+      client.status = newStatus;
+      filterTable();
+      refreshStatsFromData();
+    }
+
+    function changeStatusFromModal(newStatus) {
+      if (currentSelectedClient) {
+        toggleStatus(currentSelectedClient._id, newStatus);
+        clientModalInstance.hide();
+      }
+    }
+
+    // Supprimer un client
+    async function deleteClient(id) {
+      if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement ce compte client ?')) return;
+
+      try {
+        await fetch(`${API_URL}/${id}`, {
+          method: 'DELETE',
+          headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {}
+        });
+      } catch (err) {
+        console.log('Suppression locale.');
+      }
+
+      clientsData = clientsData.filter(c => c._id !== id);
+      filterTable();
+      refreshStatsFromData();
+    }
+  </script>
+  <script src="clients.js"></script>
+</body>
+</html>
