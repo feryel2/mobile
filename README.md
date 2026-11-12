@@ -51,9 +51,10 @@ Pour créer les comptes de démonstration et quelques véhicules :
 node seed.js
 ```
 
-Le seed ajoute les comptes de démonstration et les véhicules qui manquent ;
-il conserve les utilisateurs et véhicules déjà présents. Les mots de passe
-initiaux sont affichés dans le terminal uniquement pour les comptes créés.
+Le seed ajoute les comptes et véhicules de démonstration manquants, ainsi qu’une
+réservation confirmée et une réservation annulée ; il conserve les données déjà
+présentes et ne duplique pas ces exemples. Les mots de passe initiaux sont
+affichés dans le terminal uniquement pour les comptes créés.
 L’inscription, la réinitialisation du mot de passe et la modification de
 l’adresse email après connexion utilisent un code envoyé par email; elles
 nécessitent de configurer les paramètres SMTP dans `.env`. Le cache SQLite du

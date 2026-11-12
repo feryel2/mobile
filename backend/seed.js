@@ -1,9 +1,18 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Vehicle = require('./models/Vehicle');
+const Reservation = require('./models/Reservation');
+const { generateReservedDays } = require('./utils/reservationDates');
 require('dotenv').config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/carrent_db';
+
+function dateAtOffset(offsetDays) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date;
+}
 
 async function createUserIfMissing(userData) {
   const existingUser = await User.findOne({ email: userData.email }).select('_id');
@@ -13,6 +22,47 @@ async function createUserIfMissing(userData) {
   }
 
   await new User(userData).save();
+  return true;
+}
+
+async function createDemoReservationIfMissing(
+  client,
+  vehicle,
+  pickupOffsetDays,
+  returnOffsetDays,
+  status
+) {
+  const pickupLocation = 'Agence CarRent Tunis - Démo';
+  const returnLocation = 'Agence CarRent Tunis - Démo';
+  const existingReservation = await Reservation.findOne({
+    clientId: client._id,
+    vehicleId: vehicle._id,
+    pickupLocation,
+    returnLocation
+  }).select('_id');
+
+  if (existingReservation) {
+    console.log(`Réservation de démonstration déjà présente : ${vehicle.immatriculation}`);
+    return false;
+  }
+
+  const pickupDate = dateAtOffset(pickupOffsetDays);
+  const returnDate = dateAtOffset(returnOffsetDays);
+  const dailyPriceMillimes = Math.round(vehicle.prix * 1000);
+  const reservedDays = generateReservedDays(pickupDate, returnDate);
+
+  await Reservation.create({
+    clientId: client._id,
+    vehicleId: vehicle._id,
+    pickupDate,
+    returnDate,
+    reservedDays,
+    pickupLocation,
+    returnLocation,
+    dailyPriceMillimes,
+    totalPriceMillimes: dailyPriceMillimes * reservedDays.length,
+    status
+  });
   return true;
 }
 
@@ -123,7 +173,33 @@ const seedDatabase = async () => {
       }
     ];
 
-    for (const vehicle of vehicles) {
+    const additionalVehicles = [
+      {
+        marque: 'Peugeot',
+        modele: '208',
+        immatriculation: 'DEMO-004',
+        annee: 2024,
+        prix: 125,
+        kilometrage: 14000,
+        carburant: 'Essence',
+        disponible: true,
+        image: 'car_citadine.png'
+      },
+      {
+        marque: 'Dacia',
+        modele: 'Sandero',
+        immatriculation: 'DEMO-005',
+        annee: 2023,
+        prix: 95,
+        kilometrage: 22000,
+        carburant: 'Essence',
+        disponible: true,
+        image: 'car_citadine.png'
+      }
+    ];
+
+    const allVehicles = [...vehicles, ...additionalVehicles];
+    for (const vehicle of allVehicles) {
       await Vehicle.updateOne(
         { immatriculation: vehicle.immatriculation },
         { $setOnInsert: vehicle },
@@ -131,8 +207,33 @@ const seedDatabase = async () => {
       );
     }
 
+    const demoClient = await User.findOne({ role: 'client', status: 'active' }).sort({ email: 1 });
+    if (!demoClient) {
+      throw new Error('Aucun client actif disponible pour les réservations de démonstration.');
+    }
+
+    const reservations = [
+      { plate: 'DEMO-004', pickupOffsetDays: 5, returnOffsetDays: 8, status: 'confirmed' },
+      { plate: 'DEMO-005', pickupOffsetDays: -8, returnOffsetDays: -5, status: 'cancelled' }
+    ];
+    let insertedReservations = 0;
+    for (const reservation of reservations) {
+      const vehicle = await Vehicle.findOne({ immatriculation: reservation.plate });
+      if (!vehicle) throw new Error(`Véhicule de démonstration introuvable : ${reservation.plate}`);
+      if (await createDemoReservationIfMissing(
+        demoClient,
+        vehicle,
+        reservation.pickupOffsetDays,
+        reservation.returnOffsetDays,
+        reservation.status
+      )) {
+        insertedReservations += 1;
+      }
+    }
+
     console.log('✅ Base de données initialisée avec succès !');
-    console.log('Les véhicules de démonstration ont été ajoutés s’ils étaient absents.');
+    console.log('Les véhicules de démonstration manquants ont été ajoutés.');
+    console.log(`Réservations de démonstration ajoutées : ${insertedReservations}.`);
     if (insertedUsers.length > 0) {
       console.log('Comptes de démonstration nouvellement créés :');
       for (const user of insertedUsers) {
