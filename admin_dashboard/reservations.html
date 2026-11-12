@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CarRent Admin - Réservations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="backoffice.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand-logo"><i class="fa-solid fa-car-side"></i>CarRent</div>
+    <div class="sidebar-label">Back-office</div>
+    <nav>
+      <a href="vehicles.html" class="nav-link"><i class="fa-solid fa-car"></i> Parc Automobile</a>
+      <a href="reservations.html" class="nav-link active" aria-current="page"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
+      <a href="index.html" class="nav-link"><i class="fa-solid fa-users"></i> Gestion Clients</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <header class="top-header">
+      <div>
+        <h1>Réservations</h1>
+        <p>Consultez les locations et annulez une réservation confirmée si nécessaire.</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn btn-outline-primary btn-sm btn-pill" href="http://localhost:5173/" target="_blank" rel="noopener noreferrer">
+          <i class="fa-solid fa-user me-1"></i> Espace client
+        </a>
+        <button id="refreshPage" class="btn btn-outline-secondary btn-sm btn-pill" type="button">
+          <i class="fa-solid fa-rotate-right me-1"></i> Actualiser
+        </button>
+        <button id="logoutAdmin" class="btn btn-outline-danger btn-sm btn-pill" type="button">
+          <i class="fa-solid fa-right-from-bracket me-1"></i> Déconnexion
+        </button>
+        <span id="adminName" class="admin-name">Administrateur</span>
+      </div>
+    </header>
+
+    <div id="pageFeedback" class="alert" role="status" aria-live="polite" hidden></div>
+
+    <section class="row g-3 mb-4">
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="label">Total</div>
+          <div id="totalReservations" class="value text-primary">0</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="label">Confirmées</div>
+          <div id="confirmedReservations" class="value text-success">0</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="label">Annulées</div>
+          <div id="cancelledReservations" class="value text-danger">0</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-card">
+      <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <input id="reservationSearch" class="form-control" type="search" placeholder="Client, véhicule ou lieu..." aria-label="Rechercher une réservation">
+        <select id="reservationStatus" class="form-select" aria-label="Filtrer par statut">
+          <option value="">Tous les statuts</option>
+          <option value="confirmed">Confirmées</option>
+          <option value="cancelled">Annulées</option>
+        </select>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Véhicule</th>
+              <th>Départ</th>
+              <th>Retour</th>
+              <th>Lieu</th>
+              <th>Total</th>
+              <th>Statut</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody id="reservationRows">
+            <tr><td colspan="8" class="text-center py-4 text-muted">Chargement des réservations…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="reservationCount" class="p-3 border-top small text-muted" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="adminLoginOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
+    <form id="adminLoginForm" class="auth-card">
+      <div class="text-center mb-4">
+        <div class="auth-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <h2 id="loginTitle" class="h4 fw-bold">Espace administrateur</h2>
+        <p class="text-muted mb-0">Connectez-vous pour gérer les réservations.</p>
+      </div>
+      <div class="mb-3">
+        <label for="adminEmail" class="form-label">Adresse email</label>
+        <input id="adminEmail" class="form-control" type="email" autocomplete="username" required>
+      </div>
+      <div class="mb-3">
+        <label for="adminPassword" class="form-label">Mot de passe</label>
+        <input id="adminPassword" class="form-control" type="password" autocomplete="current-password" required>
+      </div>
+      <div id="loginError" class="alert alert-danger py-2" role="alert" hidden></div>
+      <button id="loginSubmit" class="btn btn-primary w-100 btn-pill" type="submit">
+        <i class="fa-solid fa-right-to-bracket me-1"></i> Se connecter
+      </button>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="admin-common.js"></script>
+  <script src="reservations.js"></script>
+</body>
+</html>

@@ -11,7 +11,8 @@ Le tableau de bord Web admin utilise la même API.
 - `mobile/` — app Flutter : connexion/profil, cache SQLite du profil utilisateur
   (hors ligne sur Android/iOS, sans mot de passe), catalogue et gestion admin des
   véhicules, recherche et réservation, historique.
-- `admin_dashboard/` — tableau de bord Web pour la gestion des clients.
+- `admin_dashboard/` — back-office Web pour gérer les clients, les véhicules et
+  les réservations.
 
 Les clients actifs peuvent consulter les véhicules et réserver. Les opérations
 de gestion des véhicules et les fonctions d’administration nécessitent un compte

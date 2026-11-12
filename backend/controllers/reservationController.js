@@ -169,6 +169,31 @@ exports.getMyReservations = async (req, res) => {
   }
 };
 
+exports.getAllReservations = async (req, res) => {
+  const { status } = req.query;
+  const allowedStatuses = ['confirmed', 'cancelled'];
+  if (status && !allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Statut de réservation invalide.'
+    });
+  }
+
+  try {
+    const query = status ? { status } : {};
+    const reservations = await Reservation.find(query)
+      .sort({ pickupDate: -1, createdAt: -1 })
+      .populate('vehicleId', vehicleFields)
+      .populate('clientId', 'fullname email phone');
+    return res.status(200).json({ success: true, data: reservations });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Impossible de récupérer les réservations.'
+    });
+  }
+};
+
 exports.getClientReservations = async (req, res) => {
   if (!mongoose.isObjectIdOrHexString(req.params.clientId)) {
     return res.status(400).json({ success: false, message: 'Identifiant client invalide.' });

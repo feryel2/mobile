@@ -5,6 +5,7 @@ const { protect, authorizeAdmin } = require('../middlewares/auth');
 
 router.get('/check-conflict', protect, reservationController.checkConflict);
 router.get('/mine', protect, reservationController.getMyReservations);
+router.get('/admin', protect, authorizeAdmin, reservationController.getAllReservations);
 router.get(
   '/client/:clientId',
   protect,

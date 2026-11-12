@@ -523,6 +523,9 @@
       renderTable([]);
       updatePagination();
       showLogin();
+    } else {
+      document.getElementById('adminLoginOverlay').hidden = true;
+      loadClients();
     }
   });
 })();
