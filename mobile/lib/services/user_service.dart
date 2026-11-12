@@ -130,11 +130,13 @@ class UserService {
     required String email,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/email-verifications'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email.trim()}),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/email-verifications'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email.trim()}),
+          )
+          .timeout(ApiConfig.timeout);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['success'] == true) {
         return {
@@ -147,6 +149,49 @@ class UserService {
         'success': false,
         'message':
             data['message'] ?? 'Impossible d’envoyer le code de vérification'
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur réseau : $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> changeEmail({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Session expirée'};
+      }
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/profile/email'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'email': email.trim().toLowerCase(),
+              'code': code.trim(),
+            }),
+          )
+          .timeout(ApiConfig.timeout);
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final user = User.fromJson(data['user']);
+        final cacheWarning = await _cacheUserProfile(user);
+        return {
+          'success': true,
+          'user': user,
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Impossible de modifier l’adresse email.',
       };
     } catch (e) {
       return {'success': false, 'message': 'Erreur réseau : $e'};
@@ -304,7 +349,6 @@ class UserService {
   // 4. Mettre à jour le Profil (avec support Multer Multipart pour avatar & permis)
   Future<Map<String, dynamic>> updateProfile({
     String? fullname,
-    String? email,
     String? phone,
     String? driverLicenseNumber,
     DateTime? driverLicenseIssuedDate,
@@ -325,9 +369,6 @@ class UserService {
       // Champs texte
       if (fullname != null && fullname.isNotEmpty) {
         request.fields['fullname'] = fullname;
-      }
-      if (email != null && email.isNotEmpty) {
-        request.fields['email'] = email.trim();
       }
       if (phone != null && phone.isNotEmpty) {
         request.fields['phone'] = phone;
@@ -355,7 +396,7 @@ class UserService {
         );
       }
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
       final response = await http.Response.fromStream(streamedResponse);
       final data = jsonDecode(response.body);
 

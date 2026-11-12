@@ -26,6 +26,7 @@ router.post('/login', userController.login);
 // --- ROUTES CLIENT PROTÉGÉES (JWT) ---
 // 3. Récupération des informations du profil connecté
 router.get('/profile', protect, userController.getProfile);
+router.put('/profile/email', protect, userController.changeEmail);
 
 // 4. Mise à jour du profil (nom, téléphone, avatar, permis)
 router.put('/profile', protect, userUploads, userController.updateProfile);

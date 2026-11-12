@@ -4,6 +4,8 @@ const { consumeCode } = require('./emailVerificationController');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
+const emailPattern = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
+
 // Générateur de Token JWT
 const generateToken = (userId, role) => {
   return jwt.sign(
@@ -216,17 +218,12 @@ exports.updateProfile = async (req, res) => {
     if (phone !== undefined) user.phone = phone.trim();
     if (email !== undefined) {
       const normalizedEmail = email.trim().toLowerCase();
-      const existingEmail = await User.findOne({
-        email: normalizedEmail,
-        _id: { $ne: user._id }
-      }).select('_id');
-      if (existingEmail) {
-        return res.status(409).json({
+      if (normalizedEmail !== user.email) {
+        return res.status(400).json({
           success: false,
-          message: 'Cette adresse email est déjà utilisée.'
+          message: 'Vérifiez la nouvelle adresse email avant de la modifier.'
         });
       }
-      user.email = normalizedEmail;
     }
 
     if (driverLicenseNumber !== undefined) {
@@ -286,6 +283,82 @@ exports.updateProfile = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Erreur lors de la mise à jour du profil.',
+      error: error.message
+    });
+  }
+};
+
+exports.changeEmail = async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string'
+      ? req.body.email.trim().toLowerCase()
+      : '';
+    const { code } = req.body;
+
+    if (!emailPattern.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Veuillez saisir une adresse email valide.'
+      });
+    }
+    if (typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Saisissez le code de vérification à 6 chiffres.'
+      });
+    }
+    if (email === req.user.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette adresse email est déjà associée à votre compte.'
+      });
+    }
+
+    const existingEmail = await User.findOne({
+      email,
+      _id: { $ne: req.user._id }
+    }).select('_id');
+    if (existingEmail) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cette adresse email est déjà utilisée.'
+      });
+    }
+
+    const verification = await consumeCode(email, code);
+    if (!verification.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verification.message
+      });
+    }
+
+    req.user.email = email;
+    req.user.emailVerified = true;
+    await req.user.save();
+    await EmailVerification.deleteOne({ _id: verification.verification._id });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Adresse email modifiée et vérifiée avec succès.',
+      user: req.user
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cette adresse email est déjà utilisée.'
+      });
+    }
+    if (error instanceof mongoose.Error.ValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la modification de l’adresse email.',
       error: error.message
     });
   }

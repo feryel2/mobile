@@ -9,6 +9,7 @@ test('integrated vehicle writes and reservation creation require authentication'
 
   const { port } = server.address();
   for (const [path, method] of [
+    ['/api/users/profile/email', 'PUT'],
     ['/api/vehicles', 'POST'],
     ['/api/vehicles/507f1f77bcf86cd799439011', 'PUT'],
     ['/api/reservations', 'POST']

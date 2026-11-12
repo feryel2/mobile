@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,20 +13,23 @@ import 'reservations/reservation_search_screen.dart';
 import 'vehicle_management_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.userService});
+
+  final UserService? userService;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final UserService _userService = UserService();
+  late final UserService _userService;
   final ImagePicker _picker = ImagePicker();
 
   User? _currentUser;
   bool _isLoading = true;
   bool _isSaving = false;
   int _currentIndex = 3; // Index 3 = Profil
+  final _profileFormKey = GlobalKey<FormState>();
 
   // Contrôleurs
   final _fullnameController = TextEditingController();
@@ -44,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _userService = widget.userService ?? UserService();
     _loadUserProfile();
   }
 
@@ -135,12 +141,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Sauvegarde des modifications du profil
   Future<void> _saveProfile() async {
     if (_currentUser == null) return;
+    if (!_profileFormKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
 
     final result = await _userService.updateProfile(
       fullname: _fullnameController.text.trim(),
-      email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       driverLicenseNumber: _licenseNumberController.text.trim(),
       driverLicenseIssuedDate: _selectedIssuedDate,
@@ -179,6 +185,245 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showChangeEmailDialog() async {
+    final emailController =
+        TextEditingController(text: _currentUser?.email ?? '');
+    final codeController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var codeSent = false;
+    var isBusy = false;
+    var resendSeconds = 0;
+    String? message;
+    var isError = false;
+    Timer? cooldownTimer;
+
+    void startCooldown(
+      BuildContext dialogContext,
+      StateSetter setDialogState,
+      int seconds,
+    ) {
+      cooldownTimer?.cancel();
+      setDialogState(() => resendSeconds = seconds);
+      if (seconds <= 0) return;
+      cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!dialogContext.mounted) {
+          timer.cancel();
+          return;
+        }
+        setDialogState(() {
+          resendSeconds--;
+          if (resendSeconds <= 0) timer.cancel();
+        });
+      });
+    }
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> sendCode() async {
+            final email = emailController.text.trim().toLowerCase();
+            final emailIsValid = RegExp(
+              r'^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$',
+            ).hasMatch(email);
+            if (!emailIsValid) {
+              setDialogState(() {
+                message = 'Veuillez saisir une adresse email valide.';
+                isError = true;
+              });
+              return;
+            }
+            if (email == _currentUser?.email.toLowerCase()) {
+              setDialogState(() {
+                message = 'Cette adresse est déjà associée à votre compte.';
+                isError = true;
+              });
+              return;
+            }
+
+            setDialogState(() {
+              isBusy = true;
+              message = null;
+            });
+            final response =
+                await _userService.sendEmailVerificationCode(email: email);
+            if (!dialogContext.mounted) return;
+            setDialogState(() {
+              isBusy = false;
+              isError = response['success'] != true;
+              message = response['message']?.toString();
+              if (response['success'] == true) {
+                codeSent = true;
+                codeController.clear();
+              }
+            });
+            if (response['success'] == true) {
+              startCooldown(
+                dialogContext,
+                setDialogState,
+                (response['resendAfterSeconds'] as num?)?.toInt() ?? 60,
+              );
+            }
+          }
+
+          Future<void> confirmChange() async {
+            if (!codeSent || !formKey.currentState!.validate()) return;
+            setDialogState(() {
+              isBusy = true;
+              message = null;
+            });
+            final response = await _userService.changeEmail(
+              email: emailController.text,
+              code: codeController.text,
+            );
+            if (!dialogContext.mounted) return;
+            if (response['success'] == true) {
+              Navigator.of(dialogContext).pop(response);
+              return;
+            }
+            setDialogState(() {
+              isBusy = false;
+              isError = true;
+              message = response['message']?.toString();
+            });
+          }
+
+          return AlertDialog(
+            title: const Text('Modifier l’adresse email'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Un code sera envoyé à la nouvelle adresse pour confirmer le changement.',
+                    ),
+                    if (isBusy) ...[
+                      const SizedBox(height: 12),
+                      const LinearProgressIndicator(),
+                    ],
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: emailController,
+                      enabled: !isBusy,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Nouvelle adresse email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (value) {
+                        final email = value?.trim() ?? '';
+                        return RegExp(
+                          r'^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$',
+                        ).hasMatch(email)
+                            ? null
+                            : 'Saisissez une adresse email valide.';
+                      },
+                      onChanged: (_) {
+                        if (codeSent) {
+                          setDialogState(() {
+                            codeSent = false;
+                            codeController.clear();
+                            message = null;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: isBusy || resendSeconds > 0 ? null : sendCode,
+                      icon: const Icon(Icons.send_outlined),
+                      label: Text(
+                        resendSeconds > 0
+                            ? 'Renvoyer le code dans ${resendSeconds}s'
+                            : codeSent
+                                ? 'Renvoyer le code'
+                                : 'Envoyer le code',
+                      ),
+                    ),
+                    if (codeSent) ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: codeController,
+                        enabled: !isBusy,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        maxLength: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'Code reçu par email',
+                          prefixIcon: Icon(Icons.verified_user_outlined),
+                          counterText: '',
+                        ),
+                        validator: (value) =>
+                            value != null && RegExp(r'^\d{6}$').hasMatch(value)
+                                ? null
+                                : 'Saisissez le code à 6 chiffres.',
+                      ),
+                    ],
+                    if (message != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        message!,
+                        style: TextStyle(
+                          color: isError ? dangerColor : successColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed:
+                    isBusy ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: isBusy || !codeSent ? null : confirmChange,
+                child: isBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Confirmer'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    cooldownTimer?.cancel();
+    await WidgetsBinding.instance.endOfFrame;
+    emailController.dispose();
+    codeController.dispose();
+
+    if (!mounted || result == null || result['success'] != true) return;
+    final user = result['user'] as User;
+    setState(() {
+      _currentUser = user;
+      _emailController.text = user.email;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['cacheWarning']?.toString() ??
+              'Adresse email modifiée et vérifiée.',
+        ),
+        backgroundColor: result['cacheWarning'] == null
+            ? successColor
+            : const Color(0xFFFF9800),
+      ),
+    );
   }
 
   // Dialogue de changement de mot de passe
@@ -656,47 +901,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.badge_outlined, color: primaryColor, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'Informations Personnelles',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
+      child: Form(
+        key: _profileFormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.badge_outlined, color: primaryColor, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Informations Personnelles',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            _buildInputLabel('Nom complet'),
+            TextFormField(
+              controller: _fullnameController,
+              decoration: _inputDecoration('Jean Dupont', Icons.person_outline),
+              validator: (value) {
+                final name = value?.trim() ?? '';
+                if (name.length < 2) {
+                  return 'Saisissez un nom d’au moins 2 caractères.';
+                }
+                if (name.length > 80) {
+                  return 'Le nom ne peut pas dépasser 80 caractères.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildInputLabel('Adresse Email'),
+            TextFormField(
+              controller: _emailController,
+              readOnly: true,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: _inputDecoration(
+                'exemple@domaine.com',
+                Icons.email_outlined,
+              ).copyWith(
+                suffixIcon: IconButton(
+                  tooltip: 'Modifier l’adresse email',
+                  onPressed: _isSaving ? null : _showChangeEmailDialog,
+                  icon: const Icon(Icons.edit_outlined, color: primaryColor),
                 ),
               ),
-            ],
-          ),
-          const Divider(height: 24),
-          _buildInputLabel('Nom complet'),
-          TextFormField(
-            controller: _fullnameController,
-            decoration: _inputDecoration('Jean Dupont', Icons.person_outline),
-          ),
-          const SizedBox(height: 14),
-          _buildInputLabel('Adresse Email'),
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            autocorrect: false,
-            decoration:
-                _inputDecoration('exemple@domaine.com', Icons.email_outlined),
-          ),
-          const SizedBox(height: 14),
-          _buildInputLabel('Numéro de téléphone'),
-          TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration:
-                _inputDecoration('+33 6 12 34 56 78', Icons.phone_outlined),
-          ),
-        ],
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Le changement nécessite un code de vérification.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildInputLabel('Numéro de téléphone'),
+            TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration:
+                  _inputDecoration('+33 6 12 34 56 78', Icons.phone_outlined),
+              validator: (value) {
+                final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+                if (digits.length < 7 || digits.length > 15) {
+                  return 'Saisissez un numéro valide (7 à 15 chiffres).';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
