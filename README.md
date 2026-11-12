@@ -8,7 +8,8 @@ Le tableau de bord Web admin utilise la même API.
 
 - `backend/` — API Express, authentification JWT, clients, véhicules et
   réservations.
-- `mobile/` — app Flutter : connexion/profil, catalogue et gestion admin des
+- `mobile/` — app Flutter : connexion/profil, cache SQLite du profil utilisateur
+  (hors ligne sur Android/iOS, sans mot de passe), catalogue et gestion admin des
   véhicules, recherche et réservation, historique.
 - `admin_dashboard/` — tableau de bord Web pour la gestion des clients.
 

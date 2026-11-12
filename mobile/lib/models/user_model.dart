@@ -77,7 +77,8 @@ class User {
       email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       avatar: json['avatar']?.toString() ?? '',
-      driverLicense: DriverLicense.fromJson(json['driverLicense'] as Map<String, dynamic>?),
+      driverLicense: DriverLicense.fromJson(
+          json['driverLicense'] as Map<String, dynamic>?),
       role: json['role']?.toString() ?? 'client',
       status: json['status']?.toString() ?? 'active',
       createdAt: json['createdAt'] != null
@@ -100,6 +101,45 @@ class User {
       'role': role,
       'status': status,
     };
+  }
+
+  Map<String, Object?> toDatabaseMap() {
+    return {
+      'id': id,
+      'fullname': fullname,
+      'email': email,
+      'phone': phone,
+      'avatar': avatar,
+      'driver_license_number': driverLicense.number,
+      'driver_license_issued_date': driverLicense.issuedDate?.toIso8601String(),
+      'driver_license_photo_url': driverLicense.photoUrl,
+      'role': role,
+      'status': status,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+    };
+  }
+
+  factory User.fromDatabaseMap(Map<String, Object?> map) {
+    DateTime? parseDate(Object? value) =>
+        value == null ? null : DateTime.tryParse(value.toString());
+
+    return User(
+      id: map['id']?.toString() ?? '',
+      fullname: map['fullname']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      phone: map['phone']?.toString() ?? '',
+      avatar: map['avatar']?.toString() ?? '',
+      driverLicense: DriverLicense(
+        number: map['driver_license_number']?.toString() ?? '',
+        issuedDate: parseDate(map['driver_license_issued_date']),
+        photoUrl: map['driver_license_photo_url']?.toString() ?? '',
+      ),
+      role: map['role']?.toString() ?? 'client',
+      status: map['status']?.toString() ?? 'active',
+      createdAt: parseDate(map['created_at']),
+      updatedAt: parseDate(map['updated_at']),
+    );
   }
 
   // Helpers pour l'affichage de l'UI

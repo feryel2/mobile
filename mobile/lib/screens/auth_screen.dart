@@ -140,9 +140,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Connexion réussie ! Bienvenue sur CarRent.'),
-            backgroundColor: Color(0xFF28A745),
+          SnackBar(
+            content: Text(
+              result['cacheWarning']?.toString() ??
+                  'Connexion réussie ! Bienvenue sur CarRent.',
+            ),
+            backgroundColor: result['cacheWarning'] == null
+                ? const Color(0xFF28A745)
+                : const Color(0xFFFF9800),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -175,9 +180,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte créé avec succès ! Bienvenue.'),
-            backgroundColor: Color(0xFF28A745),
+          SnackBar(
+            content: Text(
+              result['cacheWarning']?.toString() ??
+                  'Compte créé avec succès ! Bienvenue.',
+            ),
+            backgroundColor: result['cacheWarning'] == null
+                ? const Color(0xFF28A745)
+                : const Color(0xFFFF9800),
             behavior: SnackBarBehavior.floating,
           ),
         );

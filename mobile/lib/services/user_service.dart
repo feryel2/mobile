@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../database/helper.dart';
 import '../models/rental_model.dart';
 import '../models/user_model.dart';
 
@@ -10,6 +14,37 @@ class UserService {
 
   static const String _tokenKey = 'jwt_carrent_token';
   static const String _userCacheKey = 'user_cache_carrent';
+
+  static bool get _supportsSqliteCache =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  static bool _isNetworkError(Object error) =>
+      error is SocketException ||
+      error is TimeoutException ||
+      error is http.ClientException;
+
+  static Future<String?> _cacheUserProfile(User user) async {
+    if (!_supportsSqliteCache) return null;
+    try {
+      await DatabaseHelper.instance.cacheUserProfile(user);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userCacheKey, user.id);
+      return null;
+    } catch (error) {
+      debugPrint('Impossible de mettre le profil en cache SQLite : $error');
+      return 'Le profil est disponible en ligne, mais pas hors ligne.';
+    }
+  }
+
+  static Future<User?> _getCachedUserProfile() async {
+    if (!_supportsSqliteCache) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString(_userCacheKey);
+    if (userId == null || userId.isEmpty) return null;
+    return DatabaseHelper.instance.getCachedUserProfile(userId);
+  }
 
   // --- GESTION DU TOKEN ET DE LA SESSION ---
 
@@ -25,8 +60,16 @@ class UserService {
 
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString(_userCacheKey);
     await prefs.remove(_tokenKey);
     await prefs.remove(_userCacheKey);
+    if (_supportsSqliteCache && userId != null) {
+      try {
+        await DatabaseHelper.instance.deleteCachedUserProfile(userId);
+      } catch (error) {
+        debugPrint('Impossible de supprimer le profil SQLite local : $error');
+      }
+    }
   }
 
   static Future<bool> isAuthenticated() async {
@@ -65,7 +108,13 @@ class UserService {
         if (data['token'] != null) {
           await saveToken(data['token']);
         }
-        return {'success': true, 'user': User.fromJson(data['user'])};
+        final user = User.fromJson(data['user']);
+        final cacheWarning = await _cacheUserProfile(user);
+        return {
+          'success': true,
+          'user': user,
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,
@@ -184,7 +233,13 @@ class UserService {
         if (data['token'] != null) {
           await saveToken(data['token']);
         }
-        return {'success': true, 'user': User.fromJson(data['user'])};
+        final user = User.fromJson(data['user']);
+        final cacheWarning = await _cacheUserProfile(user);
+        return {
+          'success': true,
+          'user': user,
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,
@@ -210,12 +265,18 @@ class UserService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(ApiConfig.timeout);
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        return {'success': true, 'user': User.fromJson(data['user'])};
+        final user = User.fromJson(data['user']);
+        final cacheWarning = await _cacheUserProfile(user);
+        return {
+          'success': true,
+          'user': user,
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,
@@ -223,6 +284,19 @@ class UserService {
         };
       }
     } catch (e) {
+      if (_isNetworkError(e)) {
+        try {
+          final cachedUser = await _getCachedUserProfile();
+          if (cachedUser != null) {
+            return {'success': true, 'user': cachedUser, 'offline': true};
+          }
+        } catch (cacheError) {
+          return {
+            'success': false,
+            'message': 'Erreur réseau et cache local indisponible : $cacheError'
+          };
+        }
+      }
       return {'success': false, 'message': 'Erreur réseau : $e'};
     }
   }
@@ -286,7 +360,13 @@ class UserService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        return {'success': true, 'user': User.fromJson(data['user'])};
+        final user = User.fromJson(data['user']);
+        final cacheWarning = await _cacheUserProfile(user);
+        return {
+          'success': true,
+          'user': user,
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,

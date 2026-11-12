@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../models/user_model.dart';
 import '../models/vehicle.dart';
 
 class DatabaseHelper {
@@ -14,7 +15,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'carrent.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE vehicles (
@@ -33,8 +34,59 @@ class DatabaseHelper {
           )
         ''');
         await db.execute('CREATE INDEX idx_mongo_id ON vehicles(mongo_id)');
+        await _createUserProfilesTable(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createUserProfilesTable(db);
+        }
       },
     );
+  }
+
+  Future<void> _createUserProfilesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE user_profiles (
+        id TEXT PRIMARY KEY NOT NULL,
+        fullname TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        avatar TEXT NOT NULL DEFAULT '',
+        driver_license_number TEXT NOT NULL DEFAULT '',
+        driver_license_issued_date TEXT,
+        driver_license_photo_url TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+  }
+
+  Future<void> cacheUserProfile(User user) async {
+    final db = await database;
+    await db.insert(
+      'user_profiles',
+      user.toDatabaseMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<User?> getCachedUserProfile(String userId) async {
+    final db = await database;
+    final rows = await db.query(
+      'user_profiles',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return User.fromDatabaseMap(rows.first);
+  }
+
+  Future<void> deleteCachedUserProfile(String userId) async {
+    final db = await database;
+    await db.delete('user_profiles', where: 'id = ?', whereArgs: [userId]);
   }
 
   /// Véhicules affichés (on masque ceux supprimés hors ligne).
@@ -97,7 +149,8 @@ class DatabaseHelper {
             where: 'mongo_id = ?', whereArgs: [v.id], limit: 1);
 
         if (existing.isEmpty) {
-          await txn.insert('vehicles', v.copyWith(syncStatus: 'synced').toMap());
+          await txn.insert(
+              'vehicles', v.copyWith(syncStatus: 'synced').toMap());
         } else if (existing.first['sync_status'] == 'synced') {
           final localId = existing.first['local_id'] as int;
           await txn.update(

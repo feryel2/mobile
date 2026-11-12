@@ -73,6 +73,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _licenseNumberController.text = user.driverLicense.number;
         _selectedIssuedDate = user.driverLicense.issuedDate;
       });
+      final notice = result['offline'] == true
+          ? 'Profil affiché depuis le cache hors ligne.'
+          : result['cacheWarning']?.toString();
+      if (notice != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(notice)),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -150,9 +158,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _licenseFile = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profil mis à jour avec succès !'),
-          backgroundColor: successColor,
+        SnackBar(
+          content: Text(
+            result['cacheWarning']?.toString() ??
+                'Profil mis à jour avec succès !',
+          ),
+          backgroundColor: result['cacheWarning'] == null
+              ? successColor
+              : const Color(0xFFFF9800),
           behavior: SnackBarBehavior.floating,
         ),
       );
