@@ -15,7 +15,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'carrent.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE vehicles (
@@ -35,10 +35,14 @@ class DatabaseHelper {
         ''');
         await db.execute('CREATE INDEX idx_mongo_id ON vehicles(mongo_id)');
         await _createUserProfilesTable(db);
+        await _createAdminClientsCache(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createUserProfilesTable(db);
+        }
+        if (oldVersion < 3) {
+          await _createAdminClientsCache(db);
         }
       },
     );
@@ -59,6 +63,31 @@ class DatabaseHelper {
         status TEXT NOT NULL,
         created_at TEXT,
         updated_at TEXT
+      )
+    ''');
+  }
+
+  Future<void> _createAdminClientsCache(Database db) async {
+    await db.execute('''
+      CREATE TABLE admin_clients_cache (
+        id TEXT PRIMARY KEY NOT NULL,
+        fullname TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        avatar TEXT NOT NULL DEFAULT '',
+        driver_license_number TEXT NOT NULL DEFAULT '',
+        driver_license_issued_date TEXT,
+        driver_license_photo_url TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE admin_clients_cache_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        cached_at TEXT NOT NULL
       )
     ''');
   }
@@ -87,6 +116,81 @@ class DatabaseHelper {
   Future<void> deleteCachedUserProfile(String userId) async {
     final db = await database;
     await db.delete('user_profiles', where: 'id = ?', whereArgs: [userId]);
+  }
+
+  Future<void> cacheAdminClients(List<User> users) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('admin_clients_cache');
+      final batch = txn.batch();
+      for (final user in users.where((user) => user.role == 'client')) {
+        batch.insert(
+          'admin_clients_cache',
+          user.toDatabaseMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+      await txn.insert(
+        'admin_clients_cache_state',
+        {'id': 1, 'cached_at': DateTime.now().toIso8601String()},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+  }
+
+  Future<List<User>?> getCachedAdminClients() async {
+    final db = await database;
+    final cacheState = await db.query(
+      'admin_clients_cache_state',
+      where: 'id = ?',
+      whereArgs: [1],
+      limit: 1,
+    );
+    if (cacheState.isEmpty) return null;
+
+    final rows = await db.query(
+      'admin_clients_cache',
+      orderBy: 'created_at DESC, id ASC',
+    );
+    return rows.map(User.fromDatabaseMap).toList();
+  }
+
+  Future<void> upsertCachedAdminClient(User user) async {
+    if (user.role != 'client') return;
+
+    final db = await database;
+    await db.transaction((txn) async {
+      final cacheState = await txn.query(
+        'admin_clients_cache_state',
+        where: 'id = ?',
+        whereArgs: [1],
+        limit: 1,
+      );
+      if (cacheState.isEmpty) return;
+      await txn.insert(
+        'admin_clients_cache',
+        user.toDatabaseMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+  }
+
+  Future<void> removeCachedAdminClient(String userId) async {
+    final db = await database;
+    await db.delete(
+      'admin_clients_cache',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> clearCachedAdminClients() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('admin_clients_cache');
+      await txn.delete('admin_clients_cache_state');
+    });
   }
 
   /// Véhicules affichés (on masque ceux supprimés hors ligne).

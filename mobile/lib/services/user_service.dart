@@ -10,6 +10,10 @@ import '../models/rental_model.dart';
 import '../models/user_model.dart';
 
 class UserService {
+  UserService({http.Client? httpClient}) : _httpClient = httpClient;
+
+  final http.Client? _httpClient;
+
   static String get baseUrl => '${ApiConfig.baseUrl}/users';
 
   static const String _tokenKey = 'jwt_carrent_token';
@@ -46,6 +50,40 @@ class UserService {
     return DatabaseHelper.instance.getCachedUserProfile(userId);
   }
 
+  static Future<String?> _cacheAdminClients(List<User> users) async {
+    if (!_supportsSqliteCache) return null;
+    try {
+      await DatabaseHelper.instance.cacheAdminClients(users);
+      return null;
+    } catch (error) {
+      debugPrint(
+          'Impossible de mettre la liste client en cache SQLite : $error');
+      return 'La liste est disponible en ligne, mais le cache local n’a pas pu être actualisé.';
+    }
+  }
+
+  static Future<String?> _upsertCachedAdminClient(User user) async {
+    if (!_supportsSqliteCache) return null;
+    try {
+      await DatabaseHelper.instance.upsertCachedAdminClient(user);
+      return null;
+    } catch (error) {
+      debugPrint('Impossible de synchroniser le client dans SQLite : $error');
+      return 'Le client a été modifié, mais le cache local n’a pas pu être actualisé.';
+    }
+  }
+
+  static Future<String?> _removeCachedAdminClient(String userId) async {
+    if (!_supportsSqliteCache) return null;
+    try {
+      await DatabaseHelper.instance.removeCachedAdminClient(userId);
+      return null;
+    } catch (error) {
+      debugPrint('Impossible de supprimer le client du cache SQLite : $error');
+      return 'Le client a été supprimé, mais le cache local n’a pas pu être actualisé.';
+    }
+  }
+
   // --- GESTION DU TOKEN ET DE LA SESSION ---
 
   static Future<void> saveToken(String token) async {
@@ -68,6 +106,13 @@ class UserService {
         await DatabaseHelper.instance.deleteCachedUserProfile(userId);
       } catch (error) {
         debugPrint('Impossible de supprimer le profil SQLite local : $error');
+      }
+    }
+    if (_supportsSqliteCache) {
+      try {
+        await DatabaseHelper.instance.clearCachedAdminClients();
+      } catch (error) {
+        debugPrint('Impossible de supprimer le cache admin SQLite : $error');
       }
     }
   }
@@ -539,35 +584,89 @@ class UserService {
         return {'success': false, 'message': 'Non authentifié'};
       }
 
-      final response = await http.get(
-        Uri.parse(baseUrl),
-        headers: {
+      const limit = 100;
+      var page = 1;
+      final users = <User>[];
+      while (true) {
+        final uri = Uri.parse(baseUrl).replace(
+          queryParameters: {'page': '$page', 'limit': '$limit'},
+        );
+        final headers = {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
-        },
-      ).timeout(ApiConfig.timeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        final rawList = data['data'] ?? data['users'];
-        final list = (rawList as List?)
-                ?.map((item) => User.fromJson(item as Map<String, dynamic>))
-                .toList() ??
-            [];
-        return {'success': true, 'users': list};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Impossible de récupérer la liste des clients'
         };
+        final request = _httpClient != null
+            ? _httpClient.get(uri, headers: headers)
+            : http.get(uri, headers: headers);
+        final response = await request.timeout(ApiConfig.timeout);
+
+        final data = jsonDecode(response.body);
+        if (response.statusCode != 200 || data['success'] != true) {
+          return {
+            'success': false,
+            'message': data['message'] ??
+                'Impossible de récupérer la liste des clients'
+          };
+        }
+
+        final rawList = data['data'] ?? data['users'];
+        if (rawList is! List) {
+          return {
+            'success': false,
+            'message': 'Réponse invalide lors du chargement des clients.'
+          };
+        }
+        users.addAll(
+          rawList.map(
+            (item) => User.fromJson(Map<String, dynamic>.from(item as Map)),
+          ),
+        );
+
+        final pagination = data['pagination'];
+        final totalPages = pagination is Map
+            ? int.tryParse(pagination['totalPages']?.toString() ?? '')
+            : null;
+        if (totalPages != null) {
+          if (page >= totalPages) break;
+        } else if (rawList.length < limit) {
+          break;
+        }
+        page++;
       }
+
+      final cacheWarning = await _cacheAdminClients(users);
+      return {
+        'success': true,
+        'users': users,
+        if (cacheWarning != null) 'cacheWarning': cacheWarning,
+      };
     } catch (e) {
+      if (_isNetworkError(e) && _supportsSqliteCache) {
+        try {
+          final cachedUsers =
+              await DatabaseHelper.instance.getCachedAdminClients();
+          if (cachedUsers != null) {
+            return {
+              'success': true,
+              'users': cachedUsers,
+              'offline': true,
+            };
+          }
+        } catch (cacheError) {
+          debugPrint('Impossible de lire le cache client SQLite : $cacheError');
+          return {
+            'success': false,
+            'message':
+                'Erreur réseau et cache local indisponible : $cacheError',
+          };
+        }
+      }
       return {'success': false, 'message': 'Erreur réseau : $e'};
     }
   }
 
-  Future<Map<String, dynamic>> updateUserStatus(String userId, String status) async {
+  Future<Map<String, dynamic>> updateUserStatus(
+      String userId, String status) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -586,11 +685,21 @@ class UserService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        return {'success': true, 'message': data['message']};
+        final cacheWarning = data['user'] is Map
+            ? await _upsertCachedAdminClient(
+                User.fromJson(Map<String, dynamic>.from(data['user'] as Map)),
+              )
+            : null;
+        return {
+          'success': true,
+          'message': data['message'],
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de la mise à jour du statut'
+          'message':
+              data['message'] ?? 'Erreur lors de la mise à jour du statut'
         };
       }
     } catch (e) {
@@ -616,13 +725,68 @@ class UserService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        return {'success': true, 'message': data['message']};
+        final cacheWarning = await _removeCachedAdminClient(userId);
+        return {
+          'success': true,
+          'message': data['message'],
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de la suppression du client'
+          'message':
+              data['message'] ?? 'Erreur lors de la suppression du client'
         };
       }
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur réseau : $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateClient({
+    required String userId,
+    required String fullname,
+    required String phone,
+    required String driverLicenseNumber,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Non authentifié'};
+      }
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/$userId'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'fullname': fullname,
+              'phone': phone,
+              'driverLicenseNumber': driverLicenseNumber,
+            }),
+          )
+          .timeout(ApiConfig.timeout);
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final cacheWarning = data['user'] is Map
+            ? await _upsertCachedAdminClient(
+                User.fromJson(Map<String, dynamic>.from(data['user'] as Map)),
+              )
+            : null;
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Client mis à jour avec succès.',
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Erreur lors de la mise à jour du client'
+      };
     } catch (e) {
       return {'success': false, 'message': 'Erreur réseau : $e'};
     }
@@ -659,8 +823,18 @@ class UserService {
 
       final data = jsonDecode(response.body);
 
-      if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
-        return {'success': true, 'message': data['message'] ?? 'Client créé avec succès'};
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          data['success'] == true) {
+        final cacheWarning = data['user'] is Map
+            ? await _upsertCachedAdminClient(
+                User.fromJson(Map<String, dynamic>.from(data['user'] as Map)),
+              )
+            : null;
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Client créé avec succès',
+          if (cacheWarning != null) 'cacheWarning': cacheWarning,
+        };
       } else {
         return {
           'success': false,

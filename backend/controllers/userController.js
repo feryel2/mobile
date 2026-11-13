@@ -6,8 +6,13 @@ const { consumeCode } = require('./emailVerificationController');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
-const emailPattern = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
+const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const adminLoginTicketLifetimeMs = 60 * 1000;
+
+function isValidPhone(phone) {
+  const digits = phone.replace(/\D/g, '');
+  return /^[+()\d.\-\s]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
+}
 
 function hashAdminLoginTicket(ticket) {
   return crypto.createHash('sha256').update(ticket).digest('hex');
@@ -641,6 +646,116 @@ exports.updateUserStatus = async (req, res) => {
   }
 };
 
+// [ADMIN] Mise à jour des coordonnées d'un client (PUT /api/users/:id)
+exports.updateClientByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identifiant client invalide.'
+      });
+    }
+
+    if (req.body.email !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le changement d’e-mail doit passer par le parcours de vérification.'
+      });
+    }
+
+    const { fullname, phone, driverLicenseNumber } = req.body;
+    if (
+      fullname === undefined &&
+      phone === undefined &&
+      driverLicenseNumber === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucune information à modifier.'
+      });
+    }
+
+    for (const [field, value] of Object.entries({
+      fullname,
+      phone,
+      driverLicenseNumber
+    })) {
+      if (value !== undefined && typeof value !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: `Le champ ${field} doit être une chaîne de caractères.`
+        });
+      }
+    }
+
+    const user = await User.findOne({ _id: id, role: 'client' });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client introuvable.'
+      });
+    }
+
+    if (fullname !== undefined) {
+      const normalizedName = fullname.trim();
+      if (normalizedName.length < 2 || normalizedName.length > 80) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le nom doit contenir entre 2 et 80 caractères.'
+        });
+      }
+      user.fullname = normalizedName;
+    }
+
+    if (phone !== undefined) {
+      const normalizedPhone = phone.trim();
+      if (!isValidPhone(normalizedPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le numéro doit contenir entre 7 et 15 chiffres.'
+        });
+      }
+      user.phone = normalizedPhone;
+    }
+
+    if (driverLicenseNumber !== undefined) {
+      const normalizedNumber = driverLicenseNumber.trim();
+      if (normalizedNumber.length > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le numéro de permis ne peut pas dépasser 100 caractères.'
+        });
+      }
+      if (normalizedNumber !== user.driverLicense.number) {
+        user.driverLicense.number = normalizedNumber;
+        if (user.status !== 'suspended') {
+          user.status = 'pending_approval';
+        }
+      }
+    }
+
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Client mis à jour avec succès.',
+      user
+    });
+  } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour du client.',
+      error: error.message
+    });
+  }
+};
+
 // 8. [ADMIN] Suppression d'un client (DELETE /api/users/:id)
 exports.deleteUser = async (req, res) => {
   try {
@@ -677,14 +792,37 @@ exports.deleteUser = async (req, res) => {
 exports.createClientByAdmin = async (req, res) => {
   try {
     const { fullname, email, password, phone, driverLicenseNumber } = req.body;
-    if (!fullname || !email || !password || !phone) {
+    if (
+      typeof fullname !== 'string' ||
+      typeof email !== 'string' ||
+      typeof password !== 'string' ||
+      typeof phone !== 'string'
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Veuillez remplir tous les champs obligatoires (nom, email, mot de passe, téléphone).'
       });
     }
 
+    const normalizedName = fullname.trim();
     const trimmedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim();
+    if (
+      normalizedName.length < 2 ||
+      normalizedName.length > 80 ||
+      !emailPattern.test(trimmedEmail) ||
+      password.length < 6 ||
+      !isValidPhone(normalizedPhone) ||
+      (driverLicenseNumber !== undefined &&
+        (typeof driverLicenseNumber !== 'string' ||
+          driverLicenseNumber.trim().length > 100))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vérifiez le nom, l’e-mail, le mot de passe et le numéro de téléphone.'
+      });
+    }
+
     const existing = await User.findOne({ email: trimmedEmail });
     if (existing) {
       return res.status(409).json({
@@ -694,10 +832,10 @@ exports.createClientByAdmin = async (req, res) => {
     }
 
     const newUser = new User({
-      fullname: fullname.trim(),
+      fullname: normalizedName,
       email: trimmedEmail,
       password,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       role: 'client',
       status: 'active',
       emailVerified: true,
@@ -713,6 +851,18 @@ exports.createClientByAdmin = async (req, res) => {
       user: newUser
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Un compte existe déjà avec cet email.'
+      });
+    }
+    if (error instanceof mongoose.Error.ValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     return res.status(500).json({
       success: false,
       message: error.message || 'Erreur lors de la création du client.'

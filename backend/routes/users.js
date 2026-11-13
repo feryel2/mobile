@@ -58,7 +58,10 @@ router.get('/:id/rentals', protect, authorizeAdmin, rentalController.getClientRe
 // 10. Activation / Suspension / Validation du statut d'un client
 router.put('/:id/status', protect, authorizeAdmin, userController.updateUserStatus);
 
-// 11. Suppression d'un client
+// 11. Modification des coordonnées d'un client
+router.put('/:id', protect, authorizeAdmin, userController.updateClientByAdmin);
+
+// 12. Suppression d'un client
 router.delete('/:id', protect, authorizeAdmin, userController.deleteUser);
 
 module.exports = router;
