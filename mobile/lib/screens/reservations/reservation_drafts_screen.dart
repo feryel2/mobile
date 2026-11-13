@@ -13,6 +13,7 @@ import 'reservation_search_screen.dart';
 
 class ReservationDraftsScreen extends StatefulWidget {
   final User? client;
+  final VoidCallback? onReservationConfirmed;
   final Future<List<ReservationDraft>> Function(User)? loadDrafts;
   final Future<int> Function(User, int)? deleteDraft;
   final ReservationDraftDatabase draftDatabase;
@@ -20,6 +21,7 @@ class ReservationDraftsScreen extends StatefulWidget {
   const ReservationDraftsScreen({
     super.key,
     required this.client,
+    this.onReservationConfirmed,
     this.loadDrafts,
     this.deleteDraft,
     this.draftDatabase = const ReservationDraftDatabase(),
@@ -140,6 +142,7 @@ class _ReservationDraftsScreenState extends State<ReservationDraftsScreen> {
         MaterialPageRoute(
           builder: (_) => ReservationSearchScreen(
             client: client,
+            onReservationConfirmed: widget.onReservationConfirmed,
             draft: draft,
             draftDatabase: widget.draftDatabase,
             draftSessionIsCurrent: sessionIsCurrent,

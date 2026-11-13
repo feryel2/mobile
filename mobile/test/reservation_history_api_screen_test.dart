@@ -447,4 +447,169 @@ void main() {
               ]);
             }));
   });
+
+  testWidgets('history shows only real administrator cancellation reasons',
+      (tester) async {
+    await http.runWithClient(() async {
+      await tester
+          .pumpWidget(_app(ReservationHistoryApiScreen(client: clientA)));
+      await tester.pumpAndSettle();
+      expect(find.text('Annulée par l’administration'), findsOneWidget);
+      expect(find.text('Motif : Véhicule en réparation.'), findsOneWidget);
+      final oldBooking = find.byKey(const ValueKey('000000000000000000000012'));
+      await tester.scrollUntilVisible(oldBooking, 120);
+      expect(find.descendant(of: oldBooking, matching: find.text('Annulée')),
+          findsOneWidget);
+      final clientBooking =
+          find.byKey(const ValueKey('000000000000000000000011'));
+      expect(find.descendant(of: clientBooking, matching: find.text('Annulée')),
+          findsOneWidget);
+      expect(find.text('Motif : Ne pas afficher'), findsNothing);
+      expect(find.text('private-admin-id'), findsNothing);
+      expect(find.text(_cancel), findsNothing);
+    },
+        () => MockClient((request) async {
+              expect(request.url.path, '/api/reservations/mine');
+              return _list([
+                {
+                  ..._booking(status: 'cancelled'),
+                  'cancellationReason': 'Véhicule en réparation.',
+                  'cancelledByRole': 'admin',
+                  'cancelledAt': '2026-11-13T11:00:00.000Z',
+                  'cancelledBy': 'private-admin-id',
+                },
+                {
+                  ..._booking(
+                      id: '000000000000000000000011', status: 'cancelled'),
+                  'cancelledByRole': 'client',
+                  'cancellationReason': 'Ne pas afficher',
+                },
+                _booking(id: '000000000000000000000012', status: 'cancelled'),
+              ]);
+            }));
+  });
+  for (final succeeds in [true, false]) {
+    testWidgets(
+        'booking ${succeeds ? 'opens fresh history after Terminé' : 'failure stays in review'}',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(650, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final navigator = GlobalKey<NavigatorState>();
+      final booking = _booking(start: 2, end: 3);
+      var historyReads = 0;
+      var bookingPosts = 0;
+
+      Future<void> tapKey(String key) async {
+        final field = find.byKey(Key(key));
+        await tester.ensureVisible(field);
+        await tester.tap(field);
+        await tester.pumpAndSettle();
+      }
+
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(
+          navigatorKey: navigator,
+          theme: AppTheme.light,
+          home: ProfileScreen(userService: _ProfileService()),
+        ));
+        await tester.pumpAndSettle();
+        await _tap(tester, 'Historique');
+        expect(find.text('Aucune réservation trouvée'), findsOneWidget);
+        await _tap(tester, 'Réserver');
+        for (final key in ['pickupDate', 'returnDate']) {
+          await tapKey(key);
+          await _tap(tester, 'OK');
+        }
+        for (final key in ['pickupLocation', 'returnLocation']) {
+          await tapKey(key);
+          final location = find.text('Tunis - Aéroport').last;
+          await tester.ensureVisible(location);
+          await tester.tap(location);
+          await tester.pumpAndSettle();
+        }
+        await _tap(tester, 'Rechercher des voitures');
+        await _tap(tester, 'Choisir cette voiture');
+        await _tap(tester, 'Vérifier ma réservation');
+        final back = find.widgetWithText(OutlinedButton, 'Retour');
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(bookingPosts, 0);
+        await _tap(tester, 'Vérifier ma réservation');
+        await _tap(tester, 'Confirmer la réservation');
+        expect(bookingPosts, 1);
+        expect(historyReads, 1);
+
+        if (!succeeds) {
+          expect(find.text('Réservation confirmée'), findsNothing);
+          expect(
+              find.textContaining('Échec de la réservation'), findsOneWidget);
+          expect(find.text('Vérifier ma réservation'), findsOneWidget);
+          expect(find.byType(ReservationHistoryApiScreen), findsNothing);
+          return;
+        }
+
+        expect(find.text('Réservation confirmée'), findsOneWidget);
+        await _tap(tester, 'Terminé');
+        final history = tester.widget<ReservationHistoryApiScreen>(
+          find.byType(ReservationHistoryApiScreen),
+        );
+        expect(history.client, same(clientA));
+        expect(
+            tester
+                .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+                .currentIndex,
+            2);
+        expect(find.byKey(const ValueKey(_activeId)), findsOneWidget);
+        expect(find.text('Toyota Yaris'), findsOneWidget);
+        expect(find.text('Confirmée'), findsOneWidget);
+        expect(historyReads, 2);
+        expect(navigator.currentState!.canPop(), isFalse);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.text('Réservation confirmée'), findsNothing);
+        expect(find.text('Voitures disponibles'), findsNothing);
+        expect(find.byType(ReservationHistoryApiScreen), findsOneWidget);
+        await _tap(tester, 'Profil');
+        expect(find.text('Mon Profil'), findsOneWidget);
+        await _tap(tester, 'Réserver');
+        expect(find.text('Mes brouillons'), findsOneWidget);
+        expect(bookingPosts, 1);
+        expect(await UserService.getToken(), 'fixture-a');
+      },
+          () => MockClient((request) async {
+                switch (request.url.path) {
+                  case '/api/reservations/mine':
+                    expect(request.method, 'GET');
+                    expect(
+                        request.headers['authorization'], 'Bearer fixture-a');
+                    return _list(++historyReads == 1 ? [] : [booking]);
+                  case '/api/vehicles/available':
+                    return _list([
+                      {
+                        '_id': vehicle.id,
+                        'marque': 'Toyota',
+                        'modele': 'Yaris',
+                        'prix': 120,
+                        'annee': 2024,
+                        'kilometrage': 1000,
+                        'carburant': 'Essence',
+                        'disponible': true,
+                        'image': 'default_car.png',
+                      },
+                    ]);
+                  case '/api/reservations':
+                    expect(request.method, 'POST');
+                    expect(
+                        request.headers['authorization'], 'Bearer fixture-a');
+                    bookingPosts++;
+                    return succeeds
+                        ? _json({'success': true, 'data': booking}, 201)
+                        : _json({'message': 'Échec de la réservation'}, 500);
+                  default:
+                    expect(request.url.host, 'api.open-meteo.com');
+                    return _json({}, 503);
+                }
+              }));
+    });
+  }
 }

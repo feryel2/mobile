@@ -5,12 +5,19 @@ class Reservation {
   final String registration;
   final String image;
   final String clientId;
+  final String clientName;
   final DateTime pickupDate;
   final DateTime returnDate;
   final String pickupLocation;
   final String returnLocation;
   final int totalPriceMillimes;
   final String status;
+  final String? cancellationReason;
+  final DateTime? cancelledAt;
+  final String? cancelledByRole;
+
+  bool get cancelledByAdmin =>
+      status == 'cancelled' && cancelledByRole == 'admin';
 
   Reservation({
     required this.id,
@@ -19,23 +26,31 @@ class Reservation {
     required this.registration,
     required this.image,
     required this.clientId,
+    this.clientName = '',
     required this.pickupDate,
     required this.returnDate,
     required this.pickupLocation,
     required this.returnLocation,
     required this.totalPriceMillimes,
     required this.status,
+    this.cancellationReason,
+    this.cancelledAt,
+    this.cancelledByRole,
   });
 
-  factory Reservation.fromJson(Map<String, dynamic> json) {
+  factory Reservation.fromJson(Map<String, dynamic> json,
+      {bool adminList = false}) {
     final vehicle = json['vehicleId'] is Map<String, dynamic>
         ? json['vehicleId'] as Map<String, dynamic>
         : const <String, dynamic>{};
     final vehicleId =
         vehicle['_id']?.toString() ?? json['vehicleId']?.toString() ?? '';
+    final client = adminList && json['clientId'] is Map<String, dynamic>
+        ? json['clientId'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final clientId = client['_id'] ?? json['clientId'];
     for (final field in [
       '_id',
-      'clientId',
       'pickupLocation',
       'returnLocation',
       'status',
@@ -46,13 +61,22 @@ class Reservation {
         );
       }
     }
-    if (!RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(vehicleId)) {
+    final objectId = RegExp(r'^[a-fA-F0-9]{24}$');
+    // MongoDB returns null for a populated record that no longer exists.
+    final missingVehicle =
+        adminList && json.containsKey('vehicleId') && json['vehicleId'] == null;
+    final missingClient =
+        adminList && json.containsKey('clientId') && json['clientId'] == null;
+    if (!missingVehicle && !objectId.hasMatch(vehicleId)) {
       throw const FormatException('Identifiant véhicule invalide.');
     }
-    for (final field in ['_id', 'clientId']) {
-      if (!RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(json[field] as String)) {
-        throw FormatException('Identifiant de réservation invalide : $field.');
-      }
+    if (!objectId.hasMatch(json['_id'] as String)) {
+      throw const FormatException('Identifiant de réservation invalide : _id.');
+    }
+    if (!missingClient &&
+        (clientId is! String || !objectId.hasMatch(clientId))) {
+      throw const FormatException(
+          'Identifiant de réservation invalide : clientId.');
     }
     if (json['totalPriceMillimes'] is! int || json['totalPriceMillimes'] < 0) {
       throw const FormatException(
@@ -78,13 +102,17 @@ class Reservation {
       ].whereType<String>().where((part) => part.isNotEmpty).join(' '),
       registration: vehicle['immatriculation']?.toString() ?? '',
       image: vehicle['image']?.toString() ?? '',
-      clientId: json['clientId'],
+      clientId: missingClient ? '' : clientId as String,
+      clientName: client['fullname']?.toString().trim() ?? '',
       pickupDate: pickup,
       returnDate: end,
       pickupLocation: json['pickupLocation'],
       returnLocation: json['returnLocation'],
       totalPriceMillimes: json['totalPriceMillimes'],
       status: json['status'],
+      cancellationReason: (json['cancellationReason'] as String?)?.trim(),
+      cancelledAt: DateTime.tryParse(json['cancelledAt']?.toString() ?? ''),
+      cancelledByRole: json['cancelledByRole'] as String?,
     );
   }
 

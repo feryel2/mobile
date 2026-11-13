@@ -13,6 +13,7 @@ import 'reservation_summary_screen.dart';
 
 class AvailableCarsScreen extends StatefulWidget {
   final User? client;
+  final VoidCallback? onReservationConfirmed;
   final ReservationDraft? draft;
   final ReservationDraftDatabase draftDatabase;
   final Future<bool> Function()? draftSessionIsCurrent;
@@ -26,6 +27,7 @@ class AvailableCarsScreen extends StatefulWidget {
   const AvailableCarsScreen({
     super.key,
     this.client,
+    this.onReservationConfirmed,
     this.draft,
     this.draftDatabase = const ReservationDraftDatabase(),
     this.draftSessionIsCurrent,
@@ -149,6 +151,7 @@ class _AvailableCarsScreenState extends State<AvailableCarsScreen> {
       MaterialPageRoute(
         builder: (_) => ReservationSummaryScreen(
           client: widget.client,
+          onReservationConfirmed: widget.onReservationConfirmed,
           draft: widget.draft,
           draftDatabase: widget.draftDatabase,
           draftSessionIsCurrent: widget.draftSessionIsCurrent,

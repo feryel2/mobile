@@ -22,13 +22,21 @@
       ...options,
       headers
     });
-    const data = await parseResponse(response);
     if (response.status === 401 || response.status === 403) {
       localStorage.removeItem(tokenKey);
       window.dispatchEvent(new CustomEvent('carrent-admin-session-expired'));
     }
+    let data;
+    try {
+      data = await parseResponse(response);
+    } catch (error) {
+      error.status = response.status;
+      throw error;
+    }
     if (!response.ok || data.success === false) {
-      throw new Error(data.message || 'La requête a échoué.');
+      const error = new Error(data.message || 'La requête a échoué.');
+      error.status = response.status;
+      throw error;
     }
     return data;
   }

@@ -59,6 +59,9 @@
         const status = confirmed
           ? '<span class="badge-state badge-confirmed">Confirmée</span>'
           : '<span class="badge-state badge-cancelled">Annulée</span>';
+        const reason = reservation.status === 'cancelled' && reservation.cancellationReason
+          ? '<div class="reservation-reason small text-muted mt-1">Motif : ' + escapeHtml(reservation.cancellationReason) + '</div>'
+          : '';
         const location = `${escapeHtml(reservation.pickupLocation)} → ${escapeHtml(reservation.returnLocation)}`;
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -68,9 +71,9 @@
           <td>${formatDate(reservation.returnDate)}</td>
           <td>${location}</td>
           <td class="text-nowrap">${formatPrice(reservation.totalPriceMillimes)}</td>
-          <td>${status}</td>
+          <td>${status}${reason}</td>
           <td class="text-end">${confirmed
-            ? `<button class="btn btn-sm btn-outline-danger btn-pill" type="button" data-action="cancel" data-id="${id}">Annuler</button>`
+            ? `<button class="btn btn-sm btn-outline-danger btn-pill" type="button" data-action="cancel" data-id="${id}">Annuler la réservation</button>`
             : '<span class="text-muted">—</span>'}</td>`;
         rows.append(row);
       }
@@ -95,33 +98,141 @@
     document.getElementById('pageFeedback').hidden = true;
   }
 
-  async function cancelReservation(id) {
-    if (!window.confirm('Annuler cette réservation confirmée ?')) return;
-    try {
-      const result = await AdminApi.request(
-        `/reservations/${encodeURIComponent(id)}/cancel`,
-        { method: 'POST' }
-      );
-      await loadReservations();
-      const feedback = document.getElementById('pageFeedback');
-      feedback.className = 'alert alert-success';
-      feedback.textContent = result.message || 'Réservation annulée.';
-      feedback.hidden = false;
-    } catch (error) {
-      const feedback = document.getElementById('pageFeedback');
-      feedback.className = 'alert alert-danger';
-      feedback.textContent = error.message || 'Impossible d’annuler la réservation.';
-      feedback.hidden = false;
+
+  function showFeedback(message, type) {
+    const feedback = document.getElementById('pageFeedback');
+    feedback.className = `alert alert-${type}`;
+    feedback.textContent = message;
+    feedback.hidden = false;
+  }
+
+  function setupCancellation() {
+    const dialog = document.getElementById('cancelReservationDialog');
+    const form = document.getElementById('cancelReservationForm');
+    const reasonInput = document.getElementById('cancelReservationReason');
+    const errorBox = document.getElementById('cancelReservationError');
+    const back = document.getElementById('cancelReservationBack');
+    const submit = document.getElementById('cancelReservationSubmit');
+    const progress = document.getElementById('cancelReservationProgress');
+    const submitLabel = document.getElementById('cancelReservationSubmitLabel');
+    let reservationId;
+    let submitting = false;
+    let canSubmit = true;
+
+    function showError(message = '') {
+      errorBox.textContent = message;
+      errorBox.hidden = !message;
     }
+
+    function setSubmitting(pending) {
+      submitting = pending;
+      back.disabled = pending;
+      submit.disabled = pending || !canSubmit;
+      reasonInput.readOnly = pending || !canSubmit;
+      progress.hidden = !pending;
+      submitLabel.textContent = pending ? 'Annulation en cours…' : 'Confirmer l’annulation';
+    }
+
+    document.getElementById('reservationRows').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action="cancel"]');
+      if (!button || dialog.open || submitting) return;
+      reservationId = button.dataset.id;
+      document.getElementById('cancelReservationReference').textContent = reservationId;
+      form.reset();
+      reasonInput.removeAttribute('aria-invalid');
+      showError();
+      canSubmit = true;
+      setSubmitting(false);
+      dialog.showModal();
+    });
+
+    reasonInput.addEventListener('input', () => {
+      if (reasonInput.hasAttribute('aria-invalid')) {
+        reasonInput.removeAttribute('aria-invalid');
+        showError();
+      }
+    });
+    back.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('cancel', (event) => {
+      if (submitting) event.preventDefault();
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!dialog.open || submitting || !canSubmit) return;
+
+      const reason = reasonInput.value.trim();
+      if (!reason || reason.length > reasonInput.maxLength) {
+        reasonInput.setAttribute('aria-invalid', 'true');
+        showError(reason ? 'Le motif ne doit pas dépasser 500 caractères.' : 'Indiquez un motif d’annulation.');
+        reasonInput.focus();
+        return;
+      }
+
+      reasonInput.removeAttribute('aria-invalid');
+      showError();
+      setSubmitting(true);
+      try {
+        const result = await AdminApi.request(
+          `/reservations/${encodeURIComponent(reservationId)}/admin-cancel`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
+            signal: AbortSignal.timeout(15000)
+          }
+        );
+        if (result.success !== true || result.data?._id !== reservationId
+          || result.data.status !== 'cancelled') {
+          throw new Error('Le serveur n’a pas confirmé l’annulation.');
+        }
+      } catch (error) {
+        if (error.status === 401 || error.status === 403) {
+          // The shared session handler has already opened the login overlay.
+          dialog.close();
+          document.getElementById('loginError').textContent = error.status === 401
+            ? 'Votre session a expiré. Veuillez vous reconnecter.'
+            : 'Accès refusé. Connectez-vous avec un compte administrateur.';
+          document.getElementById('adminEmail').focus();
+        } else if (error.status === 409) {
+          canSubmit = false;
+          showError('Cette réservation est déjà annulée ou ne peut plus être annulée.');
+          try {
+            await loadReservations();
+          } catch {
+            showError('Cette réservation ne peut plus être annulée. Utilisez Actualiser pour recharger la liste.');
+          }
+        } else {
+          if (error.status === 404) canSubmit = false;
+          if (error.status === 400) {
+            reasonInput.setAttribute('aria-invalid', 'true');
+            reasonInput.readOnly = false;
+            reasonInput.focus();
+          }
+          showError(error.name === 'TimeoutError'
+            ? 'Le serveur ne répond pas. Actualisez la liste avant de réessayer.'
+            : error instanceof TypeError
+              ? 'Connexion impossible au serveur CarRent. Réessayez.'
+              : error.message || 'Impossible d’annuler la réservation.');
+        }
+        return;
+      } finally {
+        setSubmitting(false);
+      }
+
+      dialog.close();
+      try {
+        await loadReservations();
+        showFeedback('Réservation annulée avec succès.', 'success');
+      } catch {
+        showFeedback('Réservation annulée. Utilisez Actualiser pour recharger la liste.', 'warning');
+      }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('reservationSearch').addEventListener('input', renderReservations);
     document.getElementById('reservationStatus').addEventListener('change', renderReservations);
-    document.getElementById('reservationRows').addEventListener('click', (event) => {
-      const button = event.target.closest('button[data-action="cancel"]');
-      if (button) cancelReservation(button.dataset.id);
-    });
+    setupCancellation();
     AdminShell.init({ load: loadReservations });
   });
 })();

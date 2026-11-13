@@ -5,11 +5,13 @@ import '../../models/reservation_draft.dart';
 import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/reservation_date_range.dart';
+import '../../utils/reservation_locations.dart';
 import 'available_cars_screen.dart';
 import 'reservation_drafts_screen.dart';
 
 class ReservationSearchScreen extends StatefulWidget {
   final User? client;
+  final VoidCallback? onReservationConfirmed;
   final ReservationDraft? draft;
   final ReservationDraftDatabase draftDatabase;
   final Future<bool> Function()? draftSessionIsCurrent;
@@ -17,6 +19,7 @@ class ReservationSearchScreen extends StatefulWidget {
   const ReservationSearchScreen({
     super.key,
     this.client,
+    this.onReservationConfirmed,
     this.draft,
     this.draftDatabase = const ReservationDraftDatabase(),
     this.draftSessionIsCurrent,
@@ -32,7 +35,6 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   static const _textColor = Color(0xFF102047);
   static const _secondaryTextColor = Color(0xFF5D6678);
   static const _fieldRadius = BorderRadius.all(Radius.circular(10));
-  static const _locations = ['Tunis - Aéroport'];
 
   final _formKey = GlobalKey<FormState>();
   bool _showErrors = false;
@@ -171,6 +173,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
       MaterialPageRoute(
         builder: (context) => AvailableCarsScreen(
           client: widget.client,
+          onReservationConfirmed: widget.onReservationConfirmed,
           draft: widget.draft,
           draftDatabase: widget.draftDatabase,
           draftSessionIsCurrent: widget.draftSessionIsCurrent,
@@ -284,7 +287,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   }) {
     final draft = widget.draft;
     final locations = {
-      ..._locations,
+      ...reservationLocations.keys,
       if (draft != null && draft.pickupLocation.trim().isNotEmpty)
         draft.pickupLocation.trim(),
       if (draft != null && draft.returnLocation.trim().isNotEmpty)
@@ -515,7 +518,10 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                               context,
                               MaterialPageRoute<void>(
                                 builder: (context) => ReservationDraftsScreen(
-                                    client: widget.client),
+                                  client: widget.client,
+                                  onReservationConfirmed:
+                                      widget.onReservationConfirmed,
+                                ),
                               ),
                             );
                           },

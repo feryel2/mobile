@@ -158,6 +158,7 @@ exports.checkConflict = async (req, res) => {
 exports.getMyReservations = async (req, res) => {
   try {
     const reservations = await Reservation.find({ clientId: req.user._id })
+      .select('-cancelledBy')
       .sort({ pickupDate: -1, createdAt: -1 })
       .populate('vehicleId', vehicleFields);
     return res.status(200).json({ success: true, data: reservations });
@@ -220,32 +221,39 @@ exports.getClientReservations = async (req, res) => {
   }
 };
 
-exports.cancelReservation = async (req, res) => {
-  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+async function cancelConfirmedReservation(req, res, adminDetails = null) {
+  const id = req.params.id;
+  if (!mongoose.isObjectIdOrHexString(id)) {
     return res.status(400).json({ success: false, message: 'Identifiant de réservation invalide.' });
   }
 
   try {
-    const reservation = await Reservation.findById(req.params.id);
+    const filter = { _id: id, status: 'confirmed' };
+    if (!adminDetails) filter.clientId = req.user._id;
+
+    // Check the status and update the document in one MongoDB operation.
+    const reservation = await Reservation.findOneAndUpdate(
+      filter,
+      { $set: { status: 'cancelled', ...adminDetails } },
+      { returnDocument: 'after', runValidators: true }
+    );
     if (!reservation) {
-      return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
-    }
-    if (req.user.role !== 'admin'
-      && !reservation.clientId.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez pas annuler cette réservation.'
-      });
-    }
-    if (reservation.status !== 'confirmed') {
+      const existing = await Reservation.findById(id).select('clientId');
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+      }
+      if (!adminDetails && !existing.clientId.equals(req.user._id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Vous ne pouvez pas annuler cette réservation.'
+        });
+      }
       return res.status(409).json({
         success: false,
         message: 'Cette réservation ne peut plus être annulée.'
       });
     }
 
-    reservation.status = 'cancelled';
-    await reservation.save();
     await reservation.populate('vehicleId', vehicleFields);
     return res.status(200).json({ success: true, data: reservation });
   } catch (error) {
@@ -254,4 +262,31 @@ exports.cancelReservation = async (req, res) => {
       message: 'Impossible d’annuler cette réservation.'
     });
   }
+}
+
+exports.cancelReservation = async (req, res) => {
+  if (req.user.role !== 'client') {
+    return res.status(403).json({
+      success: false,
+      message: 'Utilisez la route administrateur avec un motif d’annulation.'
+    });
+  }
+  return cancelConfirmedReservation(req, res);
+};
+
+exports.adminCancelReservation = async (req, res) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!reason || reason.length > Reservation.maxCancellationReasonLength) {
+    return res.status(400).json({
+      success: false,
+      message: `Le motif d’annulation doit contenir entre 1 et ${Reservation.maxCancellationReasonLength} caractères.`
+    });
+  }
+
+  return cancelConfirmedReservation(req, res, {
+    cancellationReason: reason,
+    cancelledAt: new Date(),
+    cancelledBy: req.user._id,
+    cancelledByRole: 'admin'
+  });
 };

@@ -4,11 +4,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../../custom/reservations/reservation_vehicle_photo.dart';
 import '../../custom/reservations/reservation_verification_dialog.dart';
+import '../../custom/reservations/reservation_weather_card.dart';
 import '../../database/reservation_draft_database.dart';
 import '../../models/reservation_draft.dart';
 import '../../models/user_model.dart';
 import '../../models/vehicle.dart';
 import '../../services/reservation_service.dart';
+import '../../services/weather_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/reservation_date_range.dart';
 import 'reservation_drafts_screen.dart';
@@ -20,6 +22,8 @@ class ReservationSummaryScreen extends StatefulWidget {
   final String pickupLocation;
   final String returnLocation;
   final User? client;
+  final VoidCallback? onReservationConfirmed;
+  final WeatherService weatherService;
   final ReservationDraft? draft;
   final ReservationDraftDatabase draftDatabase;
   final Future<bool> Function()? draftSessionIsCurrent;
@@ -34,6 +38,8 @@ class ReservationSummaryScreen extends StatefulWidget {
     required this.pickupLocation,
     required this.returnLocation,
     this.client,
+    this.onReservationConfirmed,
+    this.weatherService = const WeatherService(),
     this.draft,
     this.draftDatabase = const ReservationDraftDatabase(),
     this.draftSessionIsCurrent,
@@ -206,7 +212,10 @@ class _ReservationSummaryScreenState extends State<ReservationSummaryScreen> {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => ReservationDraftsScreen(client: widget.client),
+        builder: (_) => ReservationDraftsScreen(
+          client: widget.client,
+          onReservationConfirmed: widget.onReservationConfirmed,
+        ),
       ),
     );
   }
@@ -292,7 +301,7 @@ class _ReservationSummaryScreenState extends State<ReservationSummaryScreen> {
       setState(() {
         _isSaving = false;
       });
-      await showDialog<void>(
+      final done = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) => AlertDialog(
@@ -309,13 +318,23 @@ class _ReservationSummaryScreenState extends State<ReservationSummaryScreen> {
           ),
           actions: [
             FilledButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                if (ModalRoute.of(dialogContext)?.isCurrent == true) {
+                  Navigator.pop(dialogContext, true);
+                }
+              },
               child: const Text('Terminé'),
             ),
           ],
         ),
       );
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      final openHistory = widget.onReservationConfirmed;
+      if (done == true && openHistory != null) {
+        openHistory();
+      } else {
+        Navigator.pop(context);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -538,6 +557,12 @@ class _ReservationSummaryScreenState extends State<ReservationSummaryScreen> {
                           ],
                         ));
                       }),
+                    ),
+                    const SizedBox(height: 12),
+                    ReservationWeatherCard(
+                      pickupDate: widget.pickupDate,
+                      pickupLocation: widget.pickupLocation,
+                      weatherService: widget.weatherService,
                     ),
                     const SizedBox(height: 12),
                     _card(Column(

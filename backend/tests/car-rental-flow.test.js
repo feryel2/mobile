@@ -74,6 +74,10 @@ test('reservation uses the authenticated client and vehicle price', async () => 
 
 test('availability excludes vehicles reserved on any requested day', async () => {
   const reservedVehicleId = new mongoose.Types.ObjectId();
+  const availableVehicle = { _id: new mongoose.Types.ObjectId() };
+  const pickupDate = futureDate(2);
+  const middleDate = futureDate(3);
+  const returnDate = futureDate(4);
   const originalDistinct = Reservation.distinct;
   const originalFind = Vehicle.find;
   let vehicleQuery;
@@ -81,25 +85,27 @@ test('availability excludes vehicles reserved on any requested day', async () =>
   Reservation.distinct = async (field, query) => {
     assert.equal(field, 'vehicleId');
     assert.equal(query.status, 'confirmed');
+    assert.deepEqual(query.reservedDays.$in, [new Date(pickupDate), new Date(middleDate)]);
     return [reservedVehicleId];
   };
   Vehicle.find = (query) => {
     vehicleQuery = query;
-    return { sort: async () => [] };
+    return { sort: async () => [availableVehicle] };
   };
 
   try {
     const res = response();
     await vehicleController.listAvailable({
       query: {
-        pickupDate: futureDate(2),
-        returnDate: futureDate(4)
+        pickupDate,
+        returnDate
       }
     }, res);
 
     assert.equal(res.statusCode, 200);
     assert.deepEqual(vehicleQuery._id.$nin, [reservedVehicleId]);
     assert.equal(vehicleQuery.disponible, true);
+    assert.deepEqual(res.body.data, [availableVehicle]);
   } finally {
     Reservation.distinct = originalDistinct;
     Vehicle.find = originalFind;

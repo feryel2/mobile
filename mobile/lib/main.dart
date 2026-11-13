@@ -18,7 +18,7 @@ class CarRentApp extends StatelessWidget {
   final bool isAuth;
   const CarRentApp({super.key, required this.isAuth});
 
-  @override
+@override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CarRent - Location de Voitures',

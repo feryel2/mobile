@@ -257,3 +257,39 @@ body {
     display: none;
   }
 }
+
+.reservation-dialog {
+  box-sizing: border-box;
+  width: min(calc(100% - 2rem), 480px);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: clamp(16px, 4vw, 24px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 18px 60px rgb(15 23 42 / 20%);
+}
+
+.reservation-dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+
+.reservation-dialog .form-control {
+  font-size: 16px;
+}
+
+#cancelReservationProgress[hidden] {
+  display: none;
+}
+
+.reservation-reason {
+  min-width: 10rem;
+  max-width: 22rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#cancelReservationReference {
+  overflow-wrap: anywhere;
+}

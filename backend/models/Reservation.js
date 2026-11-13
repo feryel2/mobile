@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const { parseUtcDate, generateReservedDays } = require('../utils/reservationDates');
 
+const maxCancellationReasonLength = 500;
+
 const reservationSchema = new mongoose.Schema(
   {
     vehicleId: {
@@ -88,6 +90,10 @@ const reservationSchema = new mongoose.Schema(
         message: 'Le prix total doit être un nombre entier de millimes.'
       }
     },
+    cancellationReason: { type: String, trim: true, maxlength: maxCancellationReasonLength },
+    cancelledAt: { type: Date },
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    cancelledByRole: { type: String, enum: ['admin'] },
     status: {
       type: String,
       required: true,
@@ -107,5 +113,7 @@ reservationSchema.index(
     partialFilterExpression: { status: 'confirmed' }
   }
 );
+
+reservationSchema.statics.maxCancellationReasonLength = maxCancellationReasonLength;
 
 module.exports = mongoose.model('Reservation', reservationSchema);

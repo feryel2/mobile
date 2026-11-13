@@ -14,12 +14,14 @@ class ReservationApiCard extends StatelessWidget {
   final Reservation reservation;
   final VoidCallback? onCancel;
   final bool isCancelling;
+  final bool showAdminDetails;
 
   const ReservationApiCard({
     super.key,
     required this.reservation,
     this.onCancel,
     this.isCancelling = false,
+    this.showAdminDetails = false,
   });
 
   @override
@@ -101,7 +103,11 @@ class ReservationApiCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          confirmed ? 'Confirmée' : 'Annulée',
+                          confirmed
+                              ? 'Confirmée'
+                              : reservation.cancelledByAdmin
+                                  ? 'Annulée par l’administration'
+                                  : 'Annulée',
                           style: TextStyle(
                               color: statusColor,
                               fontSize: 12,
@@ -122,14 +128,36 @@ class ReservationApiCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (confirmed)
+            if (showAdminDetails) ...[
+              const Divider(),
+              if (reservation.clientName.isNotEmpty)
+                Text('Client · ${reservation.clientName}',
+                    style: const TextStyle(
+                        color: _ink, fontWeight: FontWeight.w600)),
+              Text('Réf. · ${reservation.id}',
+                  style: const TextStyle(color: _muted, fontSize: 12)),
+            ],
+            if (reservation.cancelledByAdmin &&
+                (reservation.cancellationReason?.isNotEmpty ?? false))
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Motif : ${reservation.cancellationReason}',
+                  style: const TextStyle(color: _muted, fontSize: 13),
+                ),
+              ),
+            if (confirmed && (!showAdminDetails || onCancel != null))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: onCancel,
                   style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.darkBlue,
-                    backgroundColor: const Color(0xFFEAF1FC),
+                    foregroundColor: showAdminDetails
+                        ? const Color(0xFFA62834)
+                        : AppTheme.darkBlue,
+                    backgroundColor: showAdminDetails
+                        ? const Color(0xFFFCEFF0)
+                        : const Color(0xFFEAF1FC),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),

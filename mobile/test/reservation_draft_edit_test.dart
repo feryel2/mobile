@@ -26,7 +26,7 @@ const _resume = 'Reprendre';
 const _update = 'Mettre à jour le brouillon';
 const _search = 'Rechercher des voitures';
 const _choose = 'Choisir cette voiture';
-const _pickupLocation = 'Tunis - Aéroport';
+const _pickupLocation = 'Tunis - La Marsa';
 const _returnLocation = 'Tunis - Centre-ville';
 const _otherVehicleId = '000000000000000000000004';
 const _sessionChanged = 'Votre session a changé. Rouvrez vos brouillons.';
@@ -128,6 +128,9 @@ Future<T> _withAvailability<T>(
   return http.runWithClient(
       body,
       () => MockClient((request) async {
+            if (request.url.host == 'api.open-meteo.com') {
+              return http.Response('{}', 503);
+            }
             requests.add(request);
             expect(request.method, 'GET');
             expect(request.url.path, '/api/vehicles/available');
@@ -316,6 +319,8 @@ void main() {
         expect(database.row?.createdAt, original.createdAt);
         expect(database.row?.dailyPriceMillimes, 120500);
         expect(database.row?.rentalDays, 4);
+        expect(database.row?.pickupLocation, _pickupLocation);
+        expect(database.row?.returnLocation, _returnLocation);
         expect(database.row?.estimatedTotalMillimes, 482000);
         expect(find.byType(ReservationDraftsScreen), findsOneWidget);
         expect(find.byType(ReservationSearchScreen), findsNothing);
@@ -340,7 +345,7 @@ void main() {
       await tester.pumpAndSettle();
       await _resumeDraft(tester);
       await _tap(tester, find.byKey(const Key('returnLocation')));
-      await _tap(tester, find.text(_pickupLocation).last);
+      await _tap(tester, find.text('Tunis - Aéroport').hitTestable());
       await _tap(tester, find.text(_search));
       expect(find.textContaining('est indisponible pour ces dates'),
           findsOneWidget);
@@ -356,7 +361,8 @@ void main() {
       expect(database.row?.vehicleId, _otherVehicleId);
       expect(database.row?.vehicleName, 'Toyota Corolla');
       expect(database.row?.dailyPriceMillimes, 125123);
-      expect(database.row?.returnLocation, _pickupLocation);
+      expect(database.row?.pickupLocation, _pickupLocation);
+      expect(database.row?.returnLocation, 'Tunis - Aéroport');
       expect(requests, hasLength(2));
     });
   });

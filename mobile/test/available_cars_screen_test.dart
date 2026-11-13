@@ -60,6 +60,40 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  const locations = [
+    'Tunis - Aéroport',
+    'Tunis - Centre-ville',
+    'Tunis - Les Berges du Lac',
+    'Tunis - La Marsa',
+    'Tunis - Carthage',
+    'Tunis - Sidi Bou Saïd',
+    'Grand Tunis - Ariana',
+  ];
+  for (final width in [320.0, 360.0, 393.0, 430.0]) {
+    testWidgets('Both dropdowns offer seven locations at ${width.toInt()}dp',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester
+          .pumpWidget(const MaterialApp(home: ReservationSearchScreen()));
+      for (final key in ['pickupLocation', 'returnLocation']) {
+        final field = find.byKey(Key(key));
+        await _tapVisible(tester, field);
+        for (final location in locations) {
+          expect(find.text(location).hitTestable(), findsOneWidget);
+        }
+        await _tapVisible(tester, find.text(locations[2]).hitTestable());
+        expect(
+          tester.state<FormFieldState<String>>(field).value,
+          locations[2],
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final size in [const Size(360, 640), const Size(393, 852)]) {
     testWidgets('API vehicle cards and booking handoff fit at $size',
         (tester) async {
@@ -237,6 +271,9 @@ void main() {
       expect(requests, hasLength(1));
     },
         () => MockClient((request) async {
+              if (request.url.host == 'api.open-meteo.com') {
+                return http.Response('{}', 503);
+              }
               requests.add(request);
               return http.Response(
                   jsonEncode({

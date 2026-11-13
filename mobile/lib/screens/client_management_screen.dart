@@ -347,6 +347,7 @@ class _ClientManagementScreenState extends State<ClientManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Gestion des Clients', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF0B47C9),
         foregroundColor: Colors.white,

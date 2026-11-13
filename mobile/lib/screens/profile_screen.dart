@@ -567,6 +567,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _openReservationHistory() {
+    final profileRoute = ModalRoute.of(context);
+    Navigator.of(context).popUntil((route) => route == profileRoute);
+    setState(() {
+      _currentIndex = 2;
+    });
+  }
+
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -606,7 +614,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _currentIndex == 0
           ? VehicleListScreen(canManage: _currentUser?.role == 'admin')
           : _currentIndex == 1
-              ? ReservationSearchScreen(client: _currentUser)
+              ? ReservationSearchScreen(
+                  client: _currentUser,
+                  onReservationConfirmed: _openReservationHistory,
+                )
               : _currentIndex == 2
                   ? ReservationHistoryApiScreen(client: _currentUser)
                   : _isLoading

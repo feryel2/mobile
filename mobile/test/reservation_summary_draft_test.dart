@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:carrent_client/custom/reservations/reservation_weather_card.dart';
 import 'package:carrent_client/models/reservation_draft.dart';
 import 'package:carrent_client/models/user_model.dart';
 import 'package:carrent_client/models/vehicle.dart';
 import 'package:carrent_client/screens/reservations/reservation_drafts_screen.dart';
 import 'package:carrent_client/screens/reservations/reservation_summary_screen.dart';
+import 'package:carrent_client/services/weather_service.dart';
 import 'package:carrent_client/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -22,8 +24,24 @@ import 'fixtures/reservation_drafts.dart';
 const _save = 'Enregistrer comme brouillon';
 const _review = 'Vérifier ma réservation';
 const _book = 'Confirmer la réservation';
-const _pickupLocation = 'Tunis - Aéroport';
+const _pickupLocation = 'Tunis - La Marsa';
 const _returnLocation = 'Tunis - Centre-ville';
+
+const _weatherUnavailable = 'Prévisions météo non disponibles pour ce départ.';
+
+class _TestWeatherService extends WeatherService {
+  final Future<PickupForecast?> Function(DateTime, String)? forecast;
+
+  const _TestWeatherService([this.forecast]);
+
+  @override
+  Future<PickupForecast?> getPickupForecast({
+    required DateTime pickupDate,
+    required String pickupLocation,
+  }) async {
+    return forecast?.call(pickupDate, pickupLocation);
+  }
+}
 
 DateTime _day(int offset) {
   final now = DateTime.now();
@@ -39,6 +57,7 @@ Widget _summary({
   String returnLocation = _returnLocation,
   required Future<int> Function(User, ReservationDraft) insert,
   GlobalKey? capture,
+  WeatherService weatherService = const _TestWeatherService(),
 }) {
   return RepaintBoundary(
     key: capture,
@@ -72,6 +91,7 @@ Widget _summary({
         pickupLocation: pickupLocation,
         returnLocation: returnLocation,
         insertDraft: insert,
+        weatherService: weatherService,
       ),
     ),
   );
@@ -230,13 +250,209 @@ void main() {
     });
   }
 
+  for (final width in [320.0, 360.0, 393.0, 430.0]) {
+    testWidgets('Weather card fits the summary at ${width.toInt()}dp',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, width == 393 ? 852 : 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final pickup = DateTime(2026, 11, 14);
+      final calls = <(DateTime, String)>[];
+      await tester.pumpWidget(_summary(
+        pickup: pickup,
+        end: DateTime(2026, 11, 17),
+        weatherService: _TestWeatherService((date, location) async {
+          calls.add((date, location));
+          return PickupForecast(
+            date: date,
+            maxTemperatureCelsius: 22.4,
+            weatherCode: 2,
+          );
+        }),
+        insert: (_, __) async => fail('Viewing weather must not save a draft'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(calls, [(pickup, _pickupLocation)]);
+      final card = find.byType(ReservationWeatherCard);
+      final cardText = find.descendant(of: card, matching: find.byType(Text));
+      expect(
+        tester.widgetList<Text>(cardText).map((text) => text.data),
+        containsAll([
+          'Météo prévue au départ',
+          '14 novembre 2026',
+          '22,4°C',
+          'Partiellement nuageux',
+          'Température max. prévue',
+          'Prévisions indicatives · Source : Open-Meteo',
+        ]),
+      );
+      expect(
+          tester.getTopLeft(card).dy,
+          greaterThan(
+              tester.getTopLeft(find.text('Détails de votre trajet')).dy));
+      expect(tester.getTopLeft(card).dy,
+          lessThan(tester.getTopLeft(find.text('Tarif journalier')).dy));
+      await tester.ensureVisible(find.text(_save));
+      await tester.pumpAndSettle();
+      expect(find.text(_save).hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Forecast reloads only when the pickup changes', (tester) async {
+    final calls = <(DateTime, String)>[];
+    final service = _TestWeatherService((date, location) async {
+      calls.add((date, location));
+      if (location != _pickupLocation) return null;
+      return PickupForecast(
+          date: date, maxTemperatureCelsius: 19, weatherCode: 999);
+    });
+    Future<void> show(DateTime date, String location) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ReservationWeatherCard(
+            pickupDate: date,
+            pickupLocation: location,
+            weatherService: service,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    await show(DateTime(2026, 11, 14), _pickupLocation);
+    expect(find.text('Conditions variables'), findsOneWidget);
+    expect(find.text('19°C'), findsOneWidget);
+    await show(DateTime(2026, 11, 14, 15), _pickupLocation);
+    expect(calls, hasLength(1));
+    await show(DateTime(2026, 11, 15), _pickupLocation);
+    expect(find.text('15 novembre 2026'), findsOneWidget);
+    await show(DateTime(2026, 11, 15), _returnLocation);
+    expect(calls, hasLength(3));
+    expect(calls.last, (DateTime(2026, 11, 15), _returnLocation));
+    expect(find.text(_weatherUnavailable), findsOneWidget);
+    expect(find.text('19°C'), findsNothing);
+  });
+
+  testWidgets('Only a changed pickup location requests another forecast',
+      (tester) async {
+    final requests = <Uri>[];
+    final today = _day(0);
+    final weather = WeatherService(now: () => today);
+    Future<void> show(String pickup, String end) async {
+      await tester.pumpWidget(_summary(
+        pickupLocation: pickup,
+        returnLocation: end,
+        weatherService: weather,
+        insert: (_, __) async => fail('No draft should be saved'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    await http.runWithClient(() async {
+      await show('Tunis - Aéroport', _returnLocation);
+      await show('Tunis - Aéroport', 'Tunis - Les Berges du Lac');
+      expect(requests, hasLength(1));
+      await show(_pickupLocation, 'Tunis - Les Berges du Lac');
+      expect(requests, hasLength(2));
+      expect(requests.first.queryParameters['latitude'], '36.8511');
+      expect(requests.last.queryParameters['latitude'], '36.87818');
+      expect(requests.last.queryParameters['longitude'], '10.32466');
+      expect(find.text('21°C'), findsOneWidget);
+    },
+        () => MockClient((request) async {
+              requests.add(request.url);
+              return http.Response(
+                jsonEncode({
+                  'daily': {
+                    'time': [_day(2).toIso8601String().substring(0, 10)],
+                    'temperature_2m_max': [21],
+                    'weather_code': [0],
+                  },
+                }),
+                200,
+              );
+            }));
+  });
+
+  testWidgets('A pending forecast never blocks saving a draft', (tester) async {
+    final pending = Completer<PickupForecast?>();
+    var weatherRequests = 0;
+    var saves = 0;
+    await tester.pumpWidget(_summary(
+      client: clientA,
+      weatherService: _TestWeatherService((_, __) {
+        weatherRequests++;
+        return pending.future;
+      }),
+      insert: (_, __) async => ++saves,
+    ));
+    final indicator = find.descendant(
+      of: find.byType(ReservationWeatherCard),
+      matching: find.byType(CircularProgressIndicator),
+    );
+    expect(indicator, findsOneWidget);
+    expect(tester.widget<CircularProgressIndicator>(indicator).semanticsLabel,
+        'Chargement de la météo');
+    await _tapSave(tester);
+    await tester.pump();
+    expect(saves, 1);
+    expect(weatherRequests, 1);
+    expect(find.text('Voir mes brouillons'), findsOneWidget);
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.text(_weatherUnavailable), findsOneWidget);
+  });
+
+  testWidgets('Capture available and unavailable weather test fixtures',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.runAsync(_loadFixtureFonts);
+    final pickup = DateTime(2026, 11, 14);
+    for (final available in [true, false]) {
+      final key = GlobalKey();
+      await tester.pumpWidget(_summary(
+        client: clientA,
+        pickup: pickup,
+        end: DateTime(2026, 11, 17),
+        capture: key,
+        weatherService: _TestWeatherService((date, _) async => available
+            ? PickupForecast(
+                date: date, maxTemperatureCelsius: 22, weatherCode: 0)
+            : null),
+        insert: (_, __) async => fail('Screenshot must not save a draft'),
+      ));
+      await tester.runAsync(() async {
+        final context = tester.element(find.byType(ReservationSummaryScreen));
+        await precacheImage(
+            AssetImage('assets/images/${vehicle.image}'), context);
+      });
+      await tester.pumpAndSettle();
+      expect(
+          find.text(available ? '22°C' : _weatherUnavailable), findsOneWidget);
+      await _capture(
+          tester,
+          key,
+          available
+              ? 'weather-available-test-fixture'
+              : 'weather-unavailable-test-fixture');
+    }
+  }, skip: Platform.environment['CARRENT_SUMMARY_FIXTURE_SCREENSHOTS'] == null);
+
   testWidgets('Rapid confirmation taps send one POST and show loading',
       (tester) async {
     final pending = Completer<http.Response>();
     final requests = <http.Request>[];
+    var weatherRequests = 0;
     await http.runWithClient(() async {
       await tester.pumpWidget(_summary(
         client: clientA,
+        weatherService: WeatherService(now: () => _day(0)),
         insert: (_, __) async => fail('Booking must not insert a draft'),
       ));
       await _tapReview(tester);
@@ -262,9 +478,16 @@ void main() {
       expect(find.text(_review), findsOneWidget);
     },
         () => MockClient((request) {
+              if (request.url.host == 'api.open-meteo.com') {
+                weatherRequests++;
+                throw http.ClientException('Weather is offline');
+              }
+              expect(request.method, 'POST');
+              expect(request.url.path, '/api/reservations');
               requests.add(request);
               return pending.future;
             }));
+    expect(weatherRequests, 1);
   });
 
   for (final status in [401, 500, null]) {

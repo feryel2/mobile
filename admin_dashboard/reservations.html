@@ -97,6 +97,26 @@
     </section>
   </main>
 
+
+  <dialog id="cancelReservationDialog" class="reservation-dialog" aria-labelledby="cancelReservationTitle" aria-describedby="cancelReservationHelp">
+    <form id="cancelReservationForm" novalidate>
+      <h2 id="cancelReservationTitle" class="h5 fw-bold">Annuler la réservation</h2>
+      <p class="small fw-semibold text-primary">Référence · <span id="cancelReservationReference"></span></p>
+      <p id="cancelReservationHelp" class="small text-muted">Cette action annulera la réservation et libérera les dates du véhicule.</p>
+      <label for="cancelReservationReason" class="form-label">Motif d’annulation</label>
+      <textarea id="cancelReservationReason" class="form-control" rows="3" maxlength="500" required autofocus aria-describedby="cancelReasonLimit" placeholder="Ex. : Véhicule indisponible suite à un problème technique."></textarea>
+      <div id="cancelReasonLimit" class="form-text">500 caractères maximum</div>
+      <p id="cancelReservationError" class="alert alert-danger mt-3 mb-0 py-2" role="alert" hidden></p>
+      <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+        <button id="cancelReservationBack" class="btn btn-outline-secondary btn-pill" type="button">Retour</button>
+        <button id="cancelReservationSubmit" class="btn btn-danger btn-pill" type="submit">
+          <span id="cancelReservationProgress" class="spinner-border spinner-border-sm me-1" aria-hidden="true" hidden></span>
+          <span id="cancelReservationSubmitLabel" aria-live="polite">Confirmer l’annulation</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="adminLoginOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
     <form id="adminLoginForm" class="auth-card">
       <div class="text-center mb-4">

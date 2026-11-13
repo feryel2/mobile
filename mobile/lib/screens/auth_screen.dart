@@ -43,9 +43,9 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _openAdminDashboard({String? loginTicket}) async {
+  void _openAdminDashboard() {
     if (mounted) {
-      Navigator.of(context).push(
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => const AdminHubScreen(),
         ),
@@ -150,7 +150,7 @@ class _AuthScreenState extends State<AuthScreen> {
             );
             return;
           }
-          await _openAdminDashboard(loginTicket: handoff['ticket'] as String);
+          _openAdminDashboard();
           return;
         }
 

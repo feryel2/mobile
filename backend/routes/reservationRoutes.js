@@ -15,4 +15,6 @@ router.get(
 router.post('/', protect, reservationController.createReservation);
 router.post('/:id/cancel', protect, reservationController.cancelReservation);
 
+router.post('/:id/admin-cancel', protect, authorizeAdmin, reservationController.adminCancelReservation);
+
 module.exports = router;
