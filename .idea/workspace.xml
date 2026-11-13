@@ -4,23 +4,8 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2573b7b4-9e2d-4096-8ef4-ca27f9a32d85" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/gestion_vehicules_fullstack.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gestion_vehicules_fullstack.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
+    <list default="true" id="2573b7b4-9e2d-4096-8ef4-ca27f9a32d85" name="Changes" comment="Ajout conversion devise (API), nouvelles images et nouvelle interface">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_berline_blanche.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_berline_noire.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_citadine_jaune.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_citadine_rouge.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_citadine_verte.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_sport_orange.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_suv_bleue.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/car_suv_grise.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/default_car.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/peugeot-2008.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/assets/images/toyota yaris.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/pubspec.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +48,7 @@
     "git-widget-placeholder": "gestion-vehicule",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/gestion_vehicules_fullstack/frontend/assets/images",
-    "settings.editor.selected.configurable": "dart.settings",
+    "settings.editor.selected.configurable": "flutter.settings",
     "show.migrate.to.gradle.popup": "false"
   }
 }]]></component>
@@ -96,6 +81,27 @@
       <option name="presentableId" value="Default" />
       <updated>1793984913650</updated>
     </task>
+    <task id="LOCAL-00001" summary="Ajout conversion devise (API), nouvelles images et nouvelle interface">
+      <option name="closed" value="true" />
+      <created>1794525974181</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1794525974182</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Ajout conversion devise (API), nouvelles images et nouvelle interface">
+      <option name="closed" value="true" />
+      <created>1794526103194</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1794526103194</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Ajout conversion devise (API), nouvelles images et nouvelle interface" />
+    <option name="LAST_COMMIT_MESSAGE" value="Ajout conversion devise (API), nouvelles images et nouvelle interface" />
   </component>
 </project>
