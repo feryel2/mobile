@@ -1,10 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../database/reservation_draft_database.dart';
+import '../../models/reservation_draft.dart';
+import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/reservation_date_range.dart';
 import 'available_cars_screen.dart';
+import 'reservation_drafts_screen.dart';
 
 class ReservationSearchScreen extends StatefulWidget {
-  const ReservationSearchScreen({super.key});
+  final User? client;
+  final ReservationDraft? draft;
+  final ReservationDraftDatabase draftDatabase;
+  final Future<bool> Function()? draftSessionIsCurrent;
+
+  const ReservationSearchScreen({
+    super.key,
+    this.client,
+    this.draft,
+    this.draftDatabase = const ReservationDraftDatabase(),
+    this.draftSessionIsCurrent,
+  });
 
   @override
   State<ReservationSearchScreen> createState() =>
@@ -16,8 +32,6 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   static const _textColor = Color(0xFF102047);
   static const _secondaryTextColor = Color(0xFF5D6678);
   static const _fieldRadius = BorderRadius.all(Radius.circular(10));
-  // Provisional maximum used by the reservation backend.
-  static const _maxRentalDays = 30;
   static const _locations = ['Tunis - Aéroport'];
 
   final _formKey = GlobalKey<FormState>();
@@ -27,14 +41,24 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   String? _pickupLocation;
   String? _returnLocation;
 
+  @override
+  void initState() {
+    super.initState();
+    final draft = widget.draft;
+    if (draft == null) return;
+
+    _pickupDate = DateUtils.dateOnly(draft.pickupDate);
+    _returnDate = DateUtils.dateOnly(draft.returnDate);
+    _pickupLocation = draft.pickupLocation.trim();
+    _returnLocation = draft.returnLocation.trim();
+  }
+
   int? get _rentalDays {
     final pickup = _pickupDate;
     final end = _returnDate;
     if (pickup == null || end == null) return null;
 
-    final pickupDay = DateTime.utc(pickup.year, pickup.month, pickup.day);
-    final returnDay = DateTime.utc(end.year, end.month, end.day);
-    return returnDay.difference(pickupDay).inDays;
+    return calculateRentalDays(pickup, end);
   }
 
   String _formatDate(DateTime date) {
@@ -46,13 +70,17 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   Future<void> _selectPickupDate() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final lastDate = DateTime(today.year + 5, 12, 31);
     final pickup = _pickupDate;
     final selectedDate = await showDatePicker(
       context: context,
       helpText: 'Date de prise en charge',
-      initialDate: pickup == null || pickup.isBefore(today) ? today : pickup,
+      initialDate:
+          pickup == null || pickup.isBefore(today) || pickup.isAfter(lastDate)
+              ? today
+              : pickup,
       firstDate: today,
-      lastDate: DateTime(today.year + 5, 12, 31),
+      lastDate: lastDate,
     );
 
     if (!mounted || selectedDate == null) return;
@@ -60,7 +88,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
     setState(() {
       _pickupDate = selectedDate;
       final days = _rentalDays;
-      if (days != null && (days < 1 || days > _maxRentalDays)) {
+      if (days != null && (days < 1 || days > maxReservationRentalDays)) {
         _returnDate = null;
       }
     });
@@ -78,16 +106,22 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
     }
 
     final firstReturnDate = DateTime(pickup.year, pickup.month, pickup.day + 1);
+    final lastReturnDate = DateTime(
+      pickup.year,
+      pickup.month,
+      pickup.day + maxReservationRentalDays,
+    );
+    final end = _returnDate;
     final selectedDate = await showDatePicker(
       context: context,
       helpText: 'Date de retour',
-      initialDate: _returnDate ?? firstReturnDate,
+      initialDate: end == null ||
+              end.isBefore(firstReturnDate) ||
+              end.isAfter(lastReturnDate)
+          ? firstReturnDate
+          : end,
       firstDate: firstReturnDate,
-      lastDate: DateTime(
-        pickup.year,
-        pickup.month,
-        pickup.day + _maxRentalDays,
-      ),
+      lastDate: lastReturnDate,
       errorInvalidText:
           'Choisissez une date de retour entre 1 et 30 jours après le départ.',
     );
@@ -118,13 +152,13 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
     if (days != null && days < 1) {
       return 'Le retour doit être après la prise en charge.';
     }
-    if (days != null && days > _maxRentalDays) {
+    if (days != null && days > maxReservationRentalDays) {
       return 'La location ne peut pas dépasser 30 jours.';
     }
     return null;
   }
 
-  void _searchCars() {
+  Future<void> _searchCars() async {
     if (!_formKey.currentState!.validate()) {
       setState(() {
         _showErrors = true;
@@ -132,10 +166,14 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
       return;
     }
 
-    Navigator.push(
+    final updated = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AvailableCarsScreen(
+          client: widget.client,
+          draft: widget.draft,
+          draftDatabase: widget.draftDatabase,
+          draftSessionIsCurrent: widget.draftSessionIsCurrent,
           pickupDate: _pickupDate!,
           returnDate: _returnDate!,
           pickupLocation: _pickupLocation!,
@@ -143,6 +181,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
         ),
       ),
     );
+    if (mounted && updated == true) Navigator.pop(context, true);
   }
 
   InputDecoration _fieldDecoration(
@@ -239,11 +278,22 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   Widget _locationField({
     required Key key,
     required String label,
+    required String? initialLocation,
     required ValueChanged<String?> onChanged,
     required String missingMessage,
   }) {
+    final draft = widget.draft;
+    final locations = {
+      ..._locations,
+      if (draft != null && draft.pickupLocation.trim().isNotEmpty)
+        draft.pickupLocation.trim(),
+      if (draft != null && draft.returnLocation.trim().isNotEmpty)
+        draft.returnLocation.trim(),
+    };
     return DropdownButtonFormField<String>(
       key: key,
+      initialValue:
+          locations.contains(initialLocation) ? initialLocation : null,
       isExpanded: true,
       isDense: false,
       icon: const Icon(Icons.keyboard_arrow_down, size: 20),
@@ -252,11 +302,14 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
         verticalPadding: 3,
       ),
       hint: _fieldText(label, 'Choisir un lieu', hasValue: false),
-      items: _locations.map((location) {
-        return DropdownMenuItem(value: location, child: Text(location));
+      items: locations.map((location) {
+        return DropdownMenuItem(
+          value: location,
+          child: Text(location, overflow: TextOverflow.ellipsis),
+        );
       }).toList(),
       selectedItemBuilder: (context) {
-        return _locations.map((location) {
+        return locations.map((location) {
           return _fieldText(label, location, hasValue: true);
         }).toList();
       },
@@ -271,17 +324,20 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final days = _rentalDays;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: _pageColor,
       appBar: AppBar(
         toolbarHeight: 48,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: textTheme.titleMedium?.copyWith(
           color: Colors.white,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
-        title: const Text('Rechercher une voiture'),
+        title: Text(widget.draft == null
+            ? 'Rechercher une voiture'
+            : 'Modifier le brouillon'),
       ),
       body: SafeArea(
         top: false,
@@ -375,6 +431,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                             _locationField(
                               key: const Key('pickupLocation'),
                               label: 'Lieu de prise en charge',
+                              initialLocation: _pickupLocation,
                               missingMessage: 'Choisissez un lieu de départ.',
                               onChanged: (value) {
                                 setState(() {
@@ -386,6 +443,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                             _locationField(
                               key: const Key('returnLocation'),
                               label: 'Lieu de retour',
+                              initialLocation: _returnLocation,
                               missingMessage: 'Choisissez un lieu de retour.',
                               onChanged: (value) {
                                 setState(() {
@@ -395,7 +453,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                             ),
                             if (days != null &&
                                 days >= 1 &&
-                                days <= _maxRentalDays) ...[
+                                days <= maxReservationRentalDays) ...[
                               const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -435,7 +493,7 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                               onPressed: _searchCars,
                               style: ElevatedButton.styleFrom(
                                 visualDensity: VisualDensity.standard,
-                                textStyle: const TextStyle(
+                                textStyle: textTheme.labelLarge?.copyWith(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -447,6 +505,28 @@ class _ReservationSearchScreenState extends State<ReservationSearchScreen> {
                       ),
                     ),
                   ),
+                  if (widget.draft == null && widget.client?.role == 'client')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (context) => ReservationDraftsScreen(
+                                    client: widget.client),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.darkBlue,
+                          ),
+                          icon: const Icon(Icons.folder_outlined, size: 19),
+                          label: const Text('Mes brouillons'),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

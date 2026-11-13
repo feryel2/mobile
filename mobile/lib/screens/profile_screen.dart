@@ -625,9 +625,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _currentIndex == 0
           ? VehicleListScreen(canManage: _currentUser?.role == 'admin')
           : _currentIndex == 1
-              ? const ReservationSearchScreen()
+              ? ReservationSearchScreen(client: _currentUser)
               : _currentIndex == 2
-                  ? const ReservationHistoryApiScreen()
+                  ? ReservationHistoryApiScreen(client: _currentUser)
                   : _isLoading
                       ? const Center(
                           child: CircularProgressIndicator(color: primaryColor))
